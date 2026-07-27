@@ -1,0 +1,4 @@
+project_id = "draft-order"
+
+[functions.draftday]
+verify_jwt = false
