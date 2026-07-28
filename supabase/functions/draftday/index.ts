@@ -64,6 +64,28 @@ async function sweepExpired(comp: any) {
   for (const a of expired) await finalizeAttempt(a, comp, true);
 }
 
+// Post-completion review: only the questions this member got wrong (or never
+// reached), with their pick and the correct answer. Never sent mid-test.
+async function missedQuestions(attempt: any, comp: any) {
+  const questions = await bankQuestions(comp.config?.bank_version ?? 1);
+  const qmap = new Map(questions.map((q: any) => [q.id, q]));
+  const st = attemptState(attempt);
+  const answers = st.answers ?? {};
+  const missed: any[] = [];
+  for (const qid of st.question_order ?? []) {
+    const q: any = qmap.get(qid);
+    if (!q) continue;
+    const a = answers[qid];
+    if (a === q.correct_index) continue;
+    missed.push({
+      prompt: q.prompt,
+      your_answer: a === null || a === undefined ? null : q.options[a],
+      correct_answer: q.options[q.correct_index],
+    });
+  }
+  return missed;
+}
+
 async function memberState(c: any, comp: any, light = false) {
   await sweepExpired(comp);
   const ptoken = c.req.header("x-pt") || undefined;
@@ -81,6 +103,9 @@ async function memberState(c: any, comp: any, light = false) {
   const total = comp.config?.question_count ?? 30;
   if (attempt?.status === "finished") {
     payload.result = { score: Number(attempt.score), total, duration_ms: attempt.duration_ms };
+    if (comp.type === "wonderlic" && !light) {
+      payload.missed = await missedQuestions(attempt, comp);
+    }
   }
 
   if (visible) {
@@ -99,13 +124,14 @@ async function memberState(c: any, comp: any, light = false) {
       return { roster: roster.map((r: any) => r.display_name) };
     }
     const rows = await sql`
-      select p.display_name, a.score, a.duration_ms from attempts a
+      select p.display_name, p.real_name, a.score, a.duration_ms from attempts a
       join participants p on p.id = a.participant_id
       where p.competition_id = ${comp.id} and a.status = 'finished'
       order by a.score desc, a.duration_ms asc, a.finished_at asc`;
     return {
       leaderboard: rows.map((r: any, i: number) => ({
-        rank: i + 1, name: r.display_name, score: Number(r.score), duration_ms: r.duration_ms,
+        rank: i + 1, name: r.display_name, real_name: r.real_name,
+        score: Number(r.score), duration_ms: r.duration_ms,
       })),
     };
   }
@@ -129,6 +155,7 @@ async function memberState(c: any, comp: any, light = false) {
   if (attempt.status === "finished") {
     payload.phase = "done";
     payload.timed_out = attempt.duration_ms != null && attempt.duration_ms >= (comp.config?.time_limit_seconds ?? 360) * 1000;
+    if (!light) Object.assign(payload, await currentLeaderboard());
     return payload;
   }
   const ms = await remainingMs(attempt);

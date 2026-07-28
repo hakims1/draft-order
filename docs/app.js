@@ -23,6 +23,33 @@ let timers = [];
 function addTimer(t) { timers.push(t); }
 function clearTimers() { timers.forEach(clearInterval); timers = []; }
 
+/* ================= shared row builders ================= */
+function lbRowsHtml(rows, showScore) {
+  return rows.map((r) =>
+    '<div class="lb-row' + (r.rank === 1 ? " top" : "") + '"><span class="rk">' + r.rank + "</span>" +
+    '<span class="nm">' + esc(r.name) +
+      (r.real_name ? '<span class="rn">' + esc(r.real_name) + "</span>" : "") + "</span>" +
+    (showScore && r.score != null
+      ? '<span class="sc">' + r.score + '</span><span class="tm">' + fmtDur(r.duration_ms) + "</span>"
+      : "") +
+    "</div>"
+  ).join("");
+}
+
+function missedCardHtml(S) {
+  if (!S.result || !S.missed) return "";
+  if (!S.missed.length) {
+    return '<div class="card" style="text-align:left"><h2>Perfect sheet</h2><div class="sub">You missed nothing.</div></div>';
+  }
+  return '<div class="card" style="text-align:left"><h2>What you missed</h2>' +
+    '<div class="mut" style="margin-top:4px">' + S.missed.length + " question" + (S.missed.length === 1 ? "" : "s") + " &mdash; only you can see this.</div>" +
+    S.missed.map((m) =>
+      '<div class="miss"><div class="miss-q">' + esc(m.prompt) + "</div>" +
+      '<div class="miss-a">Your answer: ' + (m.your_answer != null ? esc(m.your_answer) : "no answer (time ran out)") + "</div>" +
+      '<div class="miss-c">Correct answer: ' + esc(m.correct_answer) + "</div></div>"
+    ).join("") + "</div>";
+}
+
 /* ================= reveal (shared) ================= */
 function renderReveal(el, standings, opts) {
   const showScore = !!opts.showScore;
@@ -179,11 +206,7 @@ function memberView(TOKEN) {
           '<div class="card"><div class="row spread"><h2>Leaderboard</h2>' +
           '<span class="mut">' + S.finished + " of " + L.member_count + " finished</span></div>" +
           (lb.length
-            ? lb.map((r) =>
-                '<div class="lb-row' + (r.rank === 1 ? " top" : "") + '"><span class="rk">' + r.rank + "</span>" +
-                '<span class="nm">' + esc(r.name) + "</span>" +
-                '<span class="sc">' + r.score + '</span><span class="tm">' + fmtDur(r.duration_ms) + "</span></div>"
-              ).join("")
+            ? lbRowsHtml(lb, true)
             : '<div class="mut" style="margin-top:10px">No scores yet &mdash; be the first on the board.</div>') +
           "</div>";
       } else if (S.roster) {
@@ -254,14 +277,18 @@ function memberView(TOKEN) {
     }
 
     if (S.phase === "done") {
+      const lb = S.leaderboard || [];
       app().innerHTML =
         '<div class="fade-in center"><div class="kicker">' + esc(L.name) + '</div>' +
         "<h1>" + (S.timed_out ? "Time!" : "Test complete") + "</h1>" +
         '<div class="card"><div class="mut">Your score</div>' +
         '<div class="bignum">' + S.result.score + '<span style="color:var(--dim);font-size:40px">/' + S.result.total + "</span></div>" +
         '<div class="sub">in ' + fmtDur(S.result.duration_ms) + "</div></div>" +
-        '<div class="card"><div class="bignum" style="font-size:52px">' + S.finished + '<span style="color:var(--dim);font-size:30px">/' + L.member_count + "</span></div>" +
-        '<div class="sub">members have finished. Standings unlock when everyone is done.</div></div></div>';
+        missedCardHtml(S) +
+        '<div class="card" style="text-align:left"><div class="row spread"><h2>Leaderboard</h2>' +
+        '<span class="mut">' + S.finished + " of " + L.member_count + " finished</span></div>" +
+        (lb.length ? lbRowsHtml(lb, true) : '<div class="mut" style="margin-top:10px">No other scores yet.</div>') +
+        '<div class="mut" style="margin-top:12px">The full draft order reveal unlocks when everyone is done.</div></div></div>';
       schedulePoll(5000);
       return;
     }
@@ -271,7 +298,7 @@ function memberView(TOKEN) {
         '<div class="fade-in" style="text-align:left"><div class="kicker">' + esc(L.name) + " &middot; " + L.season_year + '</div>' +
         "<h1>The results are in</h1>" +
         (S.result ? '<div class="sub">You scored ' + S.result.score + "/" + S.result.total + " in " + fmtDur(S.result.duration_ms) + ".</div>" : "") +
-        '<div id="reveal"></div></div>';
+        '<div id="reveal"></div>' + missedCardHtml(S) + "</div>";
       renderReveal($("#reveal"), S.standings, { showScore: S.type === "wonderlic", shareUrl: S.results_url });
       return;
     }
@@ -303,13 +330,7 @@ async function resultsView(TOKEN) {
       "<h1>Live Standings</h1>" +
       '<div class="sub">' + r.finished + " of " + r.member_count + " members have finished &middot; this page updates automatically</div>" +
       '<div class="card">' +
-      (rows.length
-        ? rows.map((s) =>
-            '<div class="lb-row' + (s.rank === 1 ? " top" : "") + '"><span class="rk">' + s.rank + "</span>" +
-            '<span class="nm">' + esc(s.name) + "</span>" +
-            (showScore ? '<span class="sc">' + s.score + '</span><span class="tm">' + fmtDur(s.duration_ms) + "</span>" : "") +
-            "</div>").join("")
-        : '<div class="mut">Nobody has finished yet.</div>') +
+      (rows.length ? lbRowsHtml(rows, showScore) : '<div class="mut">Nobody has finished yet.</div>') +
       "</div></div>";
     addTimer(setInterval(() => resultsView(TOKEN), 6000));
     return;

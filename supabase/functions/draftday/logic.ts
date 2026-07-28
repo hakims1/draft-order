@@ -81,7 +81,7 @@ export function standingsVisible(comp: any, finished: number): boolean {
 
 export async function standings(comp: any) {
   const rows = await sql`
-    select p.display_name, p.is_dnf, p.is_placeholder, a.score, a.duration_ms
+    select p.display_name, p.real_name, p.is_dnf, p.is_placeholder, a.score, a.duration_ms
     from participants p
     left join attempts a on a.participant_id = p.id and a.status = 'finished'
     where p.competition_id = ${comp.id} and (p.is_dnf or a.id is not null)
@@ -90,6 +90,7 @@ export async function standings(comp: any) {
   return rows.map((r: any, i: number) => ({
     rank: i + 1,
     name: r.display_name,
+    real_name: r.real_name,
     dnf: r.is_dnf,
     placeholder: r.is_placeholder,
     score: r.is_dnf ? null : r.score === null ? null : Number(r.score),
