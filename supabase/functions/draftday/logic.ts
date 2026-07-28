@@ -35,6 +35,13 @@ export function seededShuffle<T>(arr: T[], seed: string): T[] {
   return out;
 }
 
+
+// jsonb round-trips as an object; tolerate legacy rows stored as a JSON string.
+export function attemptState(attempt: any): any {
+  const st = attempt?.state;
+  return typeof st === "string" ? JSON.parse(st) : (st ?? {});
+}
+
 // ---------- lookups ----------
 
 export async function competitionByShareToken(token: string) {
@@ -181,7 +188,7 @@ export async function startAttempt(comp: any, participant: any) {
   const state = { question_order: order, option_orders: optionOrders, answers: {}, current_index: 0 };
   const rows = await sql`
     insert into attempts (participant_id, started_at, deadline_at, state)
-    values (${participant.id}, now(), now() + make_interval(secs => ${limitSec}), ${JSON.stringify(state)}::jsonb)
+    values (${participant.id}, now(), now() + make_interval(secs => ${limitSec}), ${sql.json(state)})
     on conflict (participant_id, attempt_number) do nothing
     returning *`;
   return rows[0] ?? await currentAttempt(participant.id);
@@ -189,7 +196,7 @@ export async function startAttempt(comp: any, participant: any) {
 
 async function scoreAttempt(attempt: any, comp: any): Promise<number> {
   const questions = await bankQuestions(comp.config?.bank_version ?? 1);
-  const answers = attempt.state?.answers ?? {};
+  const answers = attemptState(attempt).answers ?? {};
   let score = 0;
   for (const q of questions) {
     if (answers[q.id] === q.correct_index) score++;
@@ -231,7 +238,7 @@ export async function submitAnswer(
     const finalized = await finalizeAttempt(attempt, comp, true);
     return { done: true, attempt: finalized, timedOut: true };
   }
-  const st = attempt.state;
+  const st = attemptState(attempt);
   const expected = st.question_order[st.current_index];
   if (questionId !== expected) {
     return { rejected: "out_of_sync" }; // client will re-fetch state
@@ -244,7 +251,7 @@ export async function submitAnswer(
   st.answers[questionId] = original;
   st.current_index += 1;
   const [updated] = await sql`
-    update attempts set state = ${JSON.stringify(st)}::jsonb where id = ${attempt.id} returning *`;
+    update attempts set state = ${sql.json(st)} where id = ${attempt.id} returning *`;
   if (st.current_index >= st.question_order.length) {
     const finalized = await finalizeAttempt(updated, comp, false);
     return { done: true, attempt: finalized };
@@ -270,7 +277,7 @@ export async function closeCompetition(competitionId: string) {
         where bank_version = ${comp.config?.bank_version ?? 1}`;
       for (const a of inProgress) {
         let score = 0;
-        for (const q of questions) if (a.state?.answers?.[q.id] === q.correct_index) score++;
+        for (const q of questions) if (attemptState(a).answers?.[q.id] === q.correct_index) score++;
         await tx`
           update attempts set status = 'finished',
             finished_at = least(now(), deadline_at),

@@ -6,6 +6,7 @@ import {
   closeCompetition,
   competitionByResultsToken,
   competitionByShareToken,
+  attemptState,
   currentAttempt,
   finalizeAttempt,
   finishedCount,
@@ -112,7 +113,7 @@ async function memberState(c: any, comp: any) {
     await finalizeAttempt(attempt, comp, true);
     return await memberState(c, comp);
   }
-  const st = attempt.state;
+  const st = attemptState(attempt);
   const questions = await bankQuestions(comp.config?.bank_version ?? 1);
   const qmap = new Map(questions.map((q: any) => [q.id, q]));
   const qid = st.question_order[st.current_index];
