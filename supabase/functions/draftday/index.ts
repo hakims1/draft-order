@@ -212,7 +212,9 @@ app.get("/r/:rtoken/data.json", async (c) => {
     league_name: comp.league_name,
     season_year: comp.season_year,
     type: comp.type,
-    standings: visible ? await standings(comp) : null,
+    // Before the reveal this is the live partial ranking (finishers only);
+    // once visible it is the final order including DNFs.
+    standings: await standings(comp),
   });
 });
 

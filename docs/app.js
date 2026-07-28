@@ -285,13 +285,35 @@ function memberView(TOKEN) {
 
 /* ================= results page ================= */
 async function resultsView(TOKEN) {
-  const r = await fetch(API + "/r/" + TOKEN + "/data.json").then((x) => x.json());
-  if (!r.visible) {
-    app().innerHTML = '<div class="card center"><h2>Not ready yet</h2><div class="sub">' + r.finished + " of " + r.member_count + " members have finished. Check back soon.</div></div>";
-    addTimer(setInterval(() => resultsView(TOKEN), 8000));
+  let r;
+  try { r = await fetch(API + "/r/" + TOKEN + "/data.json").then((x) => x.json()); }
+  catch { addTimer(setInterval(() => resultsView(TOKEN), 8000)); return; }
+  if (r.error) {
+    clearTimers();
+    app().innerHTML = '<div class="card center"><h2>Link not found</h2></div>';
     return;
   }
   clearTimers();
+  if (!r.visible) {
+    // Not final yet: live standings that keep updating until the reveal.
+    const showScore = r.type === "wonderlic";
+    const rows = (r.standings || []).filter((s) => !s.dnf);
+    app().innerHTML =
+      '<div style="text-align:left"><div class="kicker">' + esc(r.league_name) + " &middot; " + r.season_year + '</div>' +
+      "<h1>Live Standings</h1>" +
+      '<div class="sub">' + r.finished + " of " + r.member_count + " members have finished &middot; this page updates automatically</div>" +
+      '<div class="card">' +
+      (rows.length
+        ? rows.map((s) =>
+            '<div class="lb-row' + (s.rank === 1 ? " top" : "") + '"><span class="rk">' + s.rank + "</span>" +
+            '<span class="nm">' + esc(s.name) + "</span>" +
+            (showScore ? '<span class="sc">' + s.score + '</span><span class="tm">' + fmtDur(s.duration_ms) + "</span>" : "") +
+            "</div>").join("")
+        : '<div class="mut">Nobody has finished yet.</div>') +
+      "</div></div>";
+    addTimer(setInterval(() => resultsView(TOKEN), 6000));
+    return;
+  }
   app().innerHTML =
     '<div style="text-align:left"><div class="kicker">' + esc(r.league_name) + " &middot; " + r.season_year + '</div><h1>Official Draft Order</h1>' +
     '<div id="reveal"></div></div>';
