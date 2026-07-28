@@ -157,39 +157,84 @@ function memberView(TOKEN) {
     const isW = S.type === "wonderlic";
 
     if (S.phase === "join" || S.phase === "ready") {
+      // Preserve any half-typed names across re-renders (e.g. visibility refresh).
+      const prevNm = $("#nm") ? $("#nm").value : "";
+      const prevRn = $("#rn") ? $("#rn").value : "";
+
+      const rules = isW
+        ? '<div class="rules">' +
+            '<div class="rule"><span class="ico">&#9670;</span><span><span class="gold">30 questions</span> &middot; <span class="gold">6:00</span> on the clock</span></div>' +
+            '<div class="rule"><span class="ico">&#9670;</span><span>Highest score gets to choose their <span class="gold">preferred draft slot</span></span></div>' +
+            '<div class="rule"><span class="ico">&#9670;</span><span>Ties are decided by <span class="gold">completion time</span></span></div>' +
+          "</div>"
+        : '<div class="rules">' +
+            '<div class="rule"><span class="ico">&#9670;</span><span>All <span class="gold">' + L.member_count + ' names</span> go into the draw</span></div>' +
+            '<div class="rule"><span class="ico">&#9670;</span><span>The order is drawn the moment the <span class="gold">last member locks in</span></span></div>' +
+          "</div>";
+
+      let lbCard = "";
+      if (isW) {
+        const lb = S.leaderboard || [];
+        lbCard =
+          '<div class="card"><div class="row spread"><h2>Leaderboard</h2>' +
+          '<span class="mut">' + S.finished + " of " + L.member_count + " finished</span></div>" +
+          (lb.length
+            ? lb.map((r) =>
+                '<div class="lb-row' + (r.rank === 1 ? " top" : "") + '"><span class="rk">' + r.rank + "</span>" +
+                '<span class="nm">' + esc(r.name) + "</span>" +
+                '<span class="sc">' + r.score + '</span><span class="tm">' + fmtDur(r.duration_ms) + "</span></div>"
+              ).join("")
+            : '<div class="mut" style="margin-top:10px">No scores yet &mdash; be the first on the board.</div>') +
+          "</div>";
+      } else if (S.roster) {
+        lbCard =
+          '<div class="card"><div class="row spread"><h2>Locked in</h2>' +
+          '<span class="mut">' + S.finished + " of " + L.member_count + "</span></div>" +
+          (S.roster.length
+            ? S.roster.map((n, i) =>
+                '<div class="lb-row"><span class="rk">' + (i + 1) + '</span><span class="nm">' + esc(n) + "</span></div>").join("")
+            : '<div class="mut" style="margin-top:10px">Nobody yet &mdash; get in first.</div>') +
+          "</div>";
+      }
+
       app().innerHTML =
         '<div class="fade-in" style="text-align:left"><div class="kicker">' + esc(L.name) + " &middot; " + L.season_year + '</div>' +
         "<h1>" + (isW ? "Draft Order<br>Cognitive Test" : "Random<br>Draft Order") + "</h1>" +
-        '<div class="sub">' + (isW
-          ? "30 questions &middot; 6 minutes &middot; highest score gets the first pick. Ties broken by speed."
-          : "Enter your name. When all " + L.member_count + " members are locked in, the draft order is drawn.") + "</div>" +
+        rules +
         '<div class="card">' +
-          '<div class="row spread"><span class="tag">' + (isW ? "Timed Test" : "Random Draw") + "</span>" +
-          '<span class="mut">' + S.finished + " of " + L.member_count + (isW ? " finished" : " locked in") + "</span></div>" +
+          '<div class="row spread"><span class="tag">' + (isW ? "Timed Test" : "Random Draw") + "</span></div>" +
           (S.phase === "join"
-            ? '<label for="nm">Display name</label><input id="nm" type="text" maxlength="40" placeholder="e.g. Big Mike" autocomplete="off">'
+            ? '<label for="nm">Display name</label><input id="nm" type="text" maxlength="40" placeholder="e.g. Big Mike" autocomplete="off">' +
+              '<label for="rn">Your actual name</label><input id="rn" type="text" maxlength="60" placeholder="So the commissioner knows it&#39;s you" autocomplete="name">'
             : '<div class="sub">Welcome back, <b>' + esc(S.participant.name) + "</b>.</div>") +
           (isW
             ? '<div class="warnbox"><b>Heads up:</b> the 6:00 timer starts the instant you press the button below. It cannot be paused &mdash; closing the app, losing signal, or switching tabs will NOT stop it. One attempt only.</div>'
             : "") +
           '<button class="btn" id="goBtn">' + (isW ? "Start the test" : "Lock me in") + "</button>" +
           '<div class="err" id="joinErr"></div>' +
-        "</div></div>";
+        "</div>" +
+        lbCard + "</div>";
+
+      const nm = $("#nm"), rn = $("#rn");
+      if (nm && prevNm) nm.value = prevNm;
+      if (rn && prevRn) rn.value = prevRn;
       $("#goBtn").onclick = async () => {
         if (busy) return; busy = true; $("#goBtn").disabled = true;
         try {
           if (S.phase === "join") {
             const name = ($("#nm").value || "").trim();
-            if (!name) { $("#joinErr").textContent = "Enter a name first."; return; }
-            const j = await api("/join", { name });
+            const realName = ($("#rn").value || "").trim();
+            if (!name) { $("#joinErr").textContent = "Enter a display name first."; return; }
+            if (!realName) { $("#joinErr").textContent = "Enter your actual name too."; return; }
+            const j = await api("/join", { name, real_name: realName });
             if (j.error) { $("#joinErr").textContent = j.error; return; }
             if (j.participant_token) localStorage.setItem(ptKey, j.participant_token);
           }
           setState(isW ? await api("/start", {}) : await api("/state.json"));
         } finally { busy = false; const b = $("#goBtn"); if (b) b.disabled = false; }
       };
-      const nm = $("#nm");
-      if (nm) nm.addEventListener("keydown", (e) => { if (e.key === "Enter") $("#goBtn").click(); });
+      if (nm) nm.addEventListener("keydown", (e) => { if (e.key === "Enter" && rn) rn.focus(); });
+      if (rn) rn.addEventListener("keydown", (e) => { if (e.key === "Enter") $("#goBtn").click(); });
       return;
     }
 
@@ -466,7 +511,7 @@ async function compView(id) {
       if (!lc) return;
       lc.textContent = r.finished + " of " + r.member_count + " complete";
       $("#liveBody").innerHTML = r.participants.map((p) =>
-        "<tr><td>" + esc(p.name) + "</td>" +
+        "<tr><td>" + esc(p.name) + (p.real_name ? '<div class="mut" style="font-size:12px">' + esc(p.real_name) + "</div>" : "") + "</td>" +
         "<td>" + (p.dnf ? '<span class="tag red">DNF</span>' : p.finished ? '<span class="tag green">Finished</span>' : p.started ? '<span class="tag">In test</span>' : '<span class="tag gray">Joined</span>') + "</td>" +
         "<td>" + (p.score ?? "&mdash;") + "</td>" +
         "<td>" + (p.duration_ms != null ? fmtDur(p.duration_ms) : "&mdash;") + "</td></tr>"

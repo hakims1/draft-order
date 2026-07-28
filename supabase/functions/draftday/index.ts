@@ -89,9 +89,31 @@ async function memberState(c: any, comp: any, light = false) {
     payload.results_url = comp.results_token ? `${SITE}#/r/${comp.results_token}` : null;
     return payload;
   }
+  // Landing-page leaderboard: everyone who has finished so far, best first.
+  async function currentLeaderboard() {
+    if (comp.type === "random_order") {
+      const roster = await sql`
+        select display_name from participants
+        where competition_id = ${comp.id} and not is_placeholder
+        order by created_at`;
+      return { roster: roster.map((r: any) => r.display_name) };
+    }
+    const rows = await sql`
+      select p.display_name, a.score, a.duration_ms from attempts a
+      join participants p on p.id = a.participant_id
+      where p.competition_id = ${comp.id} and a.status = 'finished'
+      order by a.score desc, a.duration_ms asc, a.finished_at asc`;
+    return {
+      leaderboard: rows.map((r: any, i: number) => ({
+        rank: i + 1, name: r.display_name, score: Number(r.score), duration_ms: r.duration_ms,
+      })),
+    };
+  }
+
   if (!participant) {
     payload.phase = comp.status === "active" ? "join" : "error";
     if (payload.phase === "error") payload.error = "This competition is not open.";
+    else Object.assign(payload, await currentLeaderboard());
     return payload;
   }
   payload.participant = { name: participant.display_name };
@@ -101,6 +123,7 @@ async function memberState(c: any, comp: any, light = false) {
   }
   if (!attempt) {
     payload.phase = "ready";
+    Object.assign(payload, await currentLeaderboard());
     return payload;
   }
   if (attempt.status === "finished") {
@@ -145,8 +168,8 @@ app.get("/c/:token/state.json", async (c) => {
 app.post("/c/:token/join", async (c) => {
   const comp = await competitionByShareToken(c.req.param("token"));
   if (!comp) return c.json({ error: "Competition not found." }, 404);
-  const { name } = await c.req.json().catch(() => ({}));
-  const res: any = await joinCompetition(comp, String(name ?? ""));
+  const { name, real_name } = await c.req.json().catch(() => ({}));
+  const res: any = await joinCompetition(comp, String(name ?? ""), String(real_name ?? ""));
   if (res.error) return c.json({ error: res.error });
   return c.json({ ok: true, participant_token: res.participant.session_token });
 });
@@ -363,7 +386,7 @@ app.get("/api/admin/competition/:id/live", async (c) => {
   if (!comp) return c.json({ error: "not found" }, 404);
   await sweepExpired(comp);
   const rows = await sql`
-    select p.display_name, p.is_dnf, a.status as astatus, a.score, a.duration_ms, a.started_at
+    select p.display_name, p.real_name, p.is_dnf, a.status as astatus, a.score, a.duration_ms, a.started_at
     from participants p
     left join attempts a on a.participant_id = p.id
     where p.competition_id = ${comp.id}
@@ -375,6 +398,7 @@ app.get("/api/admin/competition/:id/live", async (c) => {
     status: comp.status,
     participants: rows.map((r: any) => ({
       name: r.display_name,
+      real_name: r.real_name,
       dnf: r.is_dnf,
       started: r.started_at != null,
       finished: r.astatus === "finished",

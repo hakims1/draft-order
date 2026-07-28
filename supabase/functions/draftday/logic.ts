@@ -99,9 +99,11 @@ export async function standings(comp: any) {
 
 // ---------- member flow ----------
 
-export async function joinCompetition(comp: any, name: string) {
+export async function joinCompetition(comp: any, name: string, realName = "") {
   const trimmed = name.trim().slice(0, 40);
+  const realTrimmed = realName.trim().slice(0, 60);
   if (!trimmed) return { error: "Enter a display name." };
+  if (!realTrimmed) return { error: "Enter your actual name." };
   if (comp.status !== "active") return { error: "This competition is not open." };
 
   return await sql.begin(async (tx) => {
@@ -124,8 +126,8 @@ export async function joinCompetition(comp: any, name: string) {
     if (n >= comp.member_count) return { error: "This competition is full." };
 
     const [participant] = await tx`
-      insert into participants (competition_id, display_name, session_token, shuffle_seed)
-      values (${comp.id}, ${trimmed}, ${randomToken(18)}, ${randomToken(12)})
+      insert into participants (competition_id, display_name, real_name, session_token, shuffle_seed)
+      values (${comp.id}, ${trimmed}, ${realTrimmed}, ${randomToken(18)}, ${randomToken(12)})
       returning *`;
 
     // Random-order mode: generating the order once, server-side, when the last slot fills.
