@@ -64,7 +64,7 @@ async function sweepExpired(comp: any) {
   for (const a of expired) await finalizeAttempt(a, comp, true);
 }
 
-async function memberState(c: any, comp: any) {
+async function memberState(c: any, comp: any, light = false) {
   await sweepExpired(comp);
   const ptoken = c.req.header("x-pt") || undefined;
   const participant = await participantBySession(comp.id, ptoken);
@@ -111,22 +111,28 @@ async function memberState(c: any, comp: any) {
   const ms = await remainingMs(attempt);
   if (ms <= 0) {
     await finalizeAttempt(attempt, comp, true);
-    return await memberState(c, comp);
+    return await memberState(c, comp, light);
   }
   const st = attemptState(attempt);
-  const questions = await bankQuestions(comp.config?.bank_version ?? 1);
-  const qmap = new Map(questions.map((q: any) => [q.id, q]));
-  const qid = st.question_order[st.current_index];
-  const q: any = qmap.get(qid);
   payload.phase = "question";
   payload.remaining_ms = ms;
-  payload.question = {
-    id: qid,
-    index: st.current_index,
-    total: st.question_order.length,
-    prompt: q.prompt,
-    options: st.option_orders[qid].map((oi: number) => q.options[oi]),
-  };
+  payload.current_index = st.current_index;
+  payload.total = st.question_order.length;
+  // Answer acks are light: the client already holds the full question set and
+  // only needs the re-synced clock. Start/state responses carry everything so
+  // the client never waits on the network between questions.
+  if (!light) {
+    const questions = await bankQuestions(comp.config?.bank_version ?? 1);
+    const qmap = new Map(questions.map((q: any) => [q.id, q]));
+    payload.questions = st.question_order.map((qid: string) => {
+      const q: any = qmap.get(qid);
+      return {
+        id: qid,
+        prompt: q.prompt,
+        options: st.option_orders[qid].map((oi: number) => q.options[oi]),
+      };
+    });
+  }
   return payload;
 }
 
@@ -165,7 +171,7 @@ app.post("/c/:token/answer", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     await submitAnswer(comp, attempt, String(body.question_id ?? ""), Number(body.displayed_index));
   }
-  return c.json(await memberState(c, comp));
+  return c.json(await memberState(c, comp, true));
 });
 
 // ---------------- public results data ----------------

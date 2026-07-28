@@ -63,6 +63,7 @@ function renderReveal(el, standings, opts) {
 /* ================= member flow ================= */
 function memberView(TOKEN) {
   let S = null, deadlinePerf = null, expiredNotified = false, selected = null, busy = false;
+  let Q = null, total = 0, localIdx = 0, queue = Promise.resolve();
   const ptKey = "pt_" + TOKEN;
 
   const api = async (path, body) => {
@@ -77,6 +78,12 @@ function memberView(TOKEN) {
   function setState(next) {
     S = next;
     if (S.remaining_ms != null) { deadlinePerf = performance.now() + S.remaining_ms; expiredNotified = false; }
+    if (S.phase === "question") {
+      if (S.questions) { Q = S.questions; total = S.total; }
+      // Never jump backwards: pending background submits mean the server's
+      // index can lag the locally answered one.
+      localIdx = Math.max(localIdx, S.current_index ?? 0);
+    }
     render();
   }
   async function refresh() { try { setState(await api("/state.json")); } catch {} }
@@ -91,8 +98,61 @@ function memberView(TOKEN) {
     if (left <= 0 && !expiredNotified) { expiredNotified = true; refresh(); }
   }
 
+  // Answer acks ride a background queue: the UI advances instantly and only
+  // the clock re-sync (or a server-side finalization) comes back to us.
+  function handleAck(r) {
+    if (!r) return;
+    if (r.phase && r.phase !== "question") { setState(r); return; }
+    if (r.remaining_ms != null) { deadlinePerf = performance.now() + r.remaining_ms; expiredNotified = false; }
+  }
+
+  function renderQuestion() {
+    clearTimers();
+    const q = Q[localIdx];
+    app().innerHTML =
+      '<div style="text-align:left"><div class="testbar"><span class="qcount">Q ' + (localIdx + 1) + "/" + total + '</span><span class="clock" id="clock">--:--</span></div>' +
+      '<div class="qprompt" id="qp">' + esc(q.prompt) + "</div>" +
+      '<div class="opts" id="opts">' +
+      q.options.map((o, i) =>
+        '<button class="opt" data-i="' + i + '"><span class="key">' + "ABCD"[i] + "</span><span>" + esc(o) + "</span></button>"
+      ).join("") +
+      "</div>" +
+      '<button class="btn" id="nextBtn" disabled>' + (localIdx + 1 === total ? "Submit test" : "Next") + "</button></div>";
+    window.scrollTo(0, 0);
+    selected = null;
+    document.querySelectorAll(".opt").forEach((b) => {
+      b.onclick = () => {
+        selected = Number(b.dataset.i);
+        document.querySelectorAll(".opt").forEach((x) => x.classList.toggle("sel", x === b));
+        $("#nextBtn").disabled = false;
+      };
+    });
+    $("#nextBtn").onclick = () => {
+      if (selected == null) return;
+      const pick = selected;
+      queue = queue
+        .then(() => api("/answer", { question_id: q.id, displayed_index: pick }))
+        .then(handleAck)
+        .catch(() => {});
+      localIdx++;
+      if (localIdx >= total) {
+        clearTimers();
+        app().innerHTML = '<div class="fade-in center" style="padding-top:80px"><h2>Locking in your answers&hellip;</h2></div>';
+        window.scrollTo(0, 0);
+        queue = queue.then(() => refresh());
+        addTimer(setInterval(refresh, 3000)); // safety net if the final ack is lost
+      } else {
+        renderQuestion();
+      }
+    };
+    tickClock();
+    const t = setInterval(tickClock, 100);
+    addTimer(t);
+  }
+
   function render() {
     clearTimers();
+    window.scrollTo(0, 0);
     const L = S.league;
     const isW = S.type === "wonderlic";
 
@@ -144,34 +204,7 @@ function memberView(TOKEN) {
     }
 
     if (S.phase === "question") {
-      const q = S.question;
-      app().innerHTML =
-        '<div style="text-align:left"><div class="testbar"><span class="qcount">Q ' + (q.index + 1) + "/" + q.total + '</span><span class="clock" id="clock">--:--</span></div>' +
-        '<div class="qprompt" id="qp">' + esc(q.prompt) + "</div>" +
-        '<div class="opts" id="opts">' +
-        q.options.map((o, i) =>
-          '<button class="opt" data-i="' + i + '"><span class="key">' + "ABCD"[i] + "</span><span>" + esc(o) + "</span></button>"
-        ).join("") +
-        "</div>" +
-        '<button class="btn" id="nextBtn" disabled>' + (q.index + 1 === q.total ? "Submit test" : "Next") + "</button></div>";
-      selected = null;
-      document.querySelectorAll(".opt").forEach((b) => {
-        b.onclick = () => {
-          selected = Number(b.dataset.i);
-          document.querySelectorAll(".opt").forEach((x) => x.classList.toggle("sel", x === b));
-          $("#nextBtn").disabled = false;
-        };
-      });
-      $("#nextBtn").onclick = async () => {
-        if (selected == null || busy) return;
-        busy = true; $("#nextBtn").disabled = true;
-        try { setState(await api("/answer", { question_id: q.id, displayed_index: selected })); }
-        catch { $("#nextBtn").disabled = false; }
-        finally { busy = false; }
-      };
-      tickClock();
-      const t = setInterval(tickClock, 100);
-      addTimer(t);
+      renderQuestion();
       return;
     }
 
