@@ -36,7 +36,29 @@ function lbRowsHtml(rows, showScore) {
   ).join("");
 }
 
+/* Generic paywall modal — driven entirely by server-supplied copy so
+   experiments can change messaging without a frontend deploy. */
+function showPaywall(p) {
+  const bg = document.createElement("div");
+  bg.className = "modal-bg open";
+  bg.innerHTML =
+    '<div class="modal"><div class="kicker">Premium</div>' +
+    "<h2>" + esc(p.title) + "</h2>" +
+    '<div class="mut" style="margin-top:8px">' + esc(p.message) + "</div>" +
+    '<button class="btn" disabled title="Payments coming soon">' + esc(p.cta) + "</button>" +
+    '<div class="mut center" style="margin-top:8px;font-size:12px">Payments aren&#39;t live yet.</div>' +
+    '<button class="btn ghost" id="pwClose">Not now</button></div>';
+  document.body.appendChild(bg);
+  bg.querySelector("#pwClose").onclick = () => bg.remove();
+}
+
 function missedCardHtml(S) {
+  if (S.missed_locked && S.missed_paywall) {
+    const p = S.missed_paywall;
+    return '<div class="card" style="text-align:left"><h2>' + esc(p.title) + "</h2>" +
+      '<div class="sub">' + esc(p.message) + "</div>" +
+      '<button class="btn ghost" disabled title="Payments coming soon">' + esc(p.cta) + "</button></div>";
+  }
   if (!S.result || !S.missed) return "";
   if (!S.missed.length) {
     return '<div class="card" style="text-align:left"><h2>Perfect sheet</h2><div class="sub">You missed nothing.</div></div>';
@@ -404,18 +426,17 @@ async function adminHome() {
       <button class="btn ghost small" id="logoutBtn">Log out</button>
     </div>
     <div class="mut">${esc(d.email)}</div>
-    ${d.leagues.map((l) => `
+    ${d.leagues.map((l) => {
+      const comp = l.competitions[0];
+      return `
       <div class="card">
         <div class="row spread">
-          <div><h2>${esc(l.name)}</h2><div class="mut">${l.season_year} season · ${l.member_count} members</div></div>
-          <a class="btn ghost small" href="#/admin/league/${l.id}">Manage</a>
+          <div><h2>${esc(l.name)}</h2><div class="mut">${l.season_year} season · ${l.member_count} members
+            ${comp ? ` · ${typeName(comp.type)} ${statusTag(comp.status)}` : " · no competition yet"}</div></div>
+          <a class="btn ghost small" href="${comp ? `#/admin/comp/${comp.id}` : `#/admin/league/${l.id}`}">Manage</a>
         </div>
-        ${l.competitions.map((c) => `
-          <div class="row spread" style="margin-top:8px">
-            <span>${typeName(c.type)} ${statusTag(c.status)}</span>
-            <a href="#/admin/comp/${c.id}">Open →</a>
-          </div>`).join("")}
-      </div>`).join("") || '<div class="card mut">No leagues yet — create your first one below.</div>'}
+      </div>`;
+    }).join("") || '<div class="card mut">No leagues yet — create your first one below.</div>'}
     <div class="card">
       <h2>New league</h2>
       <label>League name</label><input type="text" id="lname" maxlength="60" placeholder="e.g. The Sunday Regrets">
@@ -439,15 +460,30 @@ async function leagueView(id) {
   let d;
   try { d = await aapi("/api/admin/league/" + id); } catch { return; }
   if (d.error) return adminHome();
+  // One competition per league: if it exists, managing the league IS managing
+  // the competition — go straight there.
+  if (d.competitions.length) {
+    location.hash = "#/admin/comp/" + d.competitions[0].id;
+    return;
+  }
   wrap().classList.add("wide");
   const l = d.league;
-  const typeName = (t) => t === "wonderlic" ? "Wonderlic Test" : "Random Order";
-  const statusTag = (s) => `<span class="tag ${s === "active" ? "" : s === "closed" ? "red" : "gray"}">${s}</span>`;
   app().innerHTML = `
     <div style="text-align:left">
     <div style="margin-top:10px"><a href="#/admin" class="mut">← Dashboard</a></div>
     <div class="kicker" style="margin-top:10px">${l.season_year} season</div>
     <h1>${esc(l.name)}</h1>
+    <div class="card">
+      <h2>Pick your competition</h2>
+      <div class="mut">How should the ${l.member_count} draft slots be decided?</div>
+      <label style="margin-top:16px">Competition type</label>
+      <select id="ctype">
+        <option value="wonderlic">Wonderlic-style timed test</option>
+        <option value="random_order">Random order generator</option>
+      </select>
+      <div class="err" id="cerr"></div>
+      <button class="btn" id="ccreate">Create competition</button>
+    </div>
     <div class="card">
       <h2>League settings</h2>
       <label>League name</label><input type="text" id="lname" value="${esc(l.name)}" maxlength="60">
@@ -455,20 +491,6 @@ async function leagueView(id) {
       <label>Number of members (competition slots)</label><input type="number" id="lmembers" value="${l.member_count}" min="2" max="64">
       <div class="okmsg" id="lmsg"></div>
       <button class="btn ghost" id="lsave">Save changes</button>
-    </div>
-    <div class="card">
-      <h2>Competitions</h2>
-      ${d.competitions.map((c) => `
-        <div class="row spread" style="margin-top:10px">
-          <div>${typeName(c.type)} ${statusTag(c.status)}</div>
-          <a class="btn ghost small" href="#/admin/comp/${c.id}">Open</a>
-        </div>`).join("") || '<div class="mut">None yet.</div>'}
-      <label style="margin-top:16px">New competition type</label>
-      <select id="ctype">
-        <option value="wonderlic">Wonderlic-style timed test</option>
-        <option value="random_order">Random order generator</option>
-      </select>
-      <button class="btn" id="ccreate">Create competition</button>
     </div></div>`;
   $("#lsave").onclick = async () => {
     await aapi("/api/admin/league/" + id, {
@@ -478,6 +500,7 @@ async function leagueView(id) {
   };
   $("#ccreate").onclick = async () => {
     const r = await aapi("/api/admin/league/" + id + "/competitions", { type: $("#ctype").value });
+    if (r.error) { $("#cerr").textContent = r.error; return; }
     location.hash = "#/admin/comp/" + r.id;
   };
 }
@@ -511,8 +534,8 @@ async function compView(id) {
       </div>
       <div class="card">
         <div class="row spread"><h2>Live status</h2><span class="tag" id="liveCount">…</span></div>
-        <table><thead><tr><th>Member</th><th>Status</th><th>Score</th><th>Time</th></tr></thead>
-        <tbody id="liveBody"><tr><td colspan="4" class="mut">Loading…</td></tr></tbody></table>
+        <table><thead><tr><th>Member</th><th>Status</th><th>Score</th><th>Time</th><th></th></tr></thead>
+        <tbody id="liveBody"><tr><td colspan="5" class="mut">Loading…</td></tr></tbody></table>
         ${c.status === "active" ? `
         <button class="btn danger" id="closeBtn">Close competition now</button>
         <div class="modal-bg" id="modalBg"><div class="modal">
@@ -526,20 +549,38 @@ async function compView(id) {
 
   app().innerHTML = `
     <div style="text-align:left">
-    <div style="margin-top:10px"><a href="#/admin/league/${l.id}" class="mut">← ${esc(l.name)}</a></div>
+    <div style="margin-top:10px"><a href="#/admin" class="mut">← Dashboard</a></div>
     <div class="kicker" style="margin-top:10px">${esc(l.name)} · ${l.season_year}</div>
     <h1>${typeName}</h1>
     <div class="row" style="margin-top:6px"><span class="tag ${c.status === "active" ? "" : c.status === "closed" ? "red" : "gray"}">${c.status}</span>
     <span class="mut">${c.type === "wonderlic" ? "30 questions · 6:00 · ties broken by speed" : "Order drawn when all members lock in"}</span></div>
-    ${block}</div>`;
+    ${block}
+    <div class="card">
+      <h2>League settings</h2>
+      <label>League name</label><input type="text" id="lname" value="${esc(l.name)}" maxlength="60">
+      <label>Season year</label><input type="number" id="lyear" value="${l.season_year}">
+      <label>Number of members (competition slots)</label><input type="number" id="lmembers" value="${l.member_count}" min="2" max="64">
+      <div class="okmsg" id="lmsg"></div>
+      <button class="btn ghost" id="lsave">Save changes</button>
+    </div></div>`;
 
   document.querySelectorAll("[data-copy]").forEach((b) => {
     b.onclick = async () => {
       try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = "Copied!"; setTimeout(() => (b.textContent = "Copy link"), 1500); } catch {}
     };
   });
+  $("#lsave").onclick = async () => {
+    await aapi("/api/admin/league/" + id, {
+      name: $("#lname").value, season_year: Number($("#lyear").value), member_count: Number($("#lmembers").value),
+    });
+    $("#lmsg").textContent = "Saved.";
+  };
   if (c.status === "draft") {
-    $("#beginBtn").onclick = async () => { await aapi("/api/admin/competition/" + id + "/activate", {}); compView(id); };
+    $("#beginBtn").onclick = async () => {
+      const r = await aapi("/api/admin/competition/" + id + "/activate", {});
+      if (r && r.paywall) { showPaywall(r.paywall); return; }
+      compView(id);
+    };
     return;
   }
   if (c.status === "active") {
@@ -557,8 +598,17 @@ async function compView(id) {
         "<tr><td>" + esc(p.name) + (p.real_name ? '<div class="mut" style="font-size:12px">' + esc(p.real_name) + "</div>" : "") + "</td>" +
         "<td>" + (p.dnf ? '<span class="tag red">DNF</span>' : p.finished ? '<span class="tag green">Finished</span>' : p.started ? '<span class="tag">In test</span>' : '<span class="tag gray">Joined</span>') + "</td>" +
         "<td>" + (p.score ?? "&mdash;") + "</td>" +
-        "<td>" + (p.duration_ms != null ? fmtDur(p.duration_ms) : "&mdash;") + "</td></tr>"
-      ).join("") || '<tr><td colspan="4" class="mut">No one has joined yet.</td></tr>';
+        "<td>" + (p.duration_ms != null ? fmtDur(p.duration_ms) : "&mdash;") + "</td>" +
+        "<td>" + (r.status === "active" ? '<button class="btn ghost small" data-del="' + p.id + '" data-nm="' + esc(p.name) + '" title="Remove this entry">&#10005;</button>' : "") + "</td></tr>"
+      ).join("") || '<tr><td colspan="5" class="mut">No one has joined yet.</td></tr>';
+      $("#liveBody").querySelectorAll("[data-del]").forEach((b) => {
+        b.onclick = async () => {
+          if (!confirm('Remove "' + b.dataset.nm + '" from this competition? Their attempt is deleted too.')) return;
+          const res = await aapi("/api/admin/competition/" + id + "/participants/" + b.dataset.del + "/delete", {});
+          if (res.error) alert(res.error);
+          poll();
+        };
+      });
     } catch {}
   }
   poll();

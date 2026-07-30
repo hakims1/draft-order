@@ -1,4 +1,5 @@
 import sql, { randomToken } from "./db.ts";
+import { logEvent } from "./gates.ts";
 
 // ---------- deterministic shuffle (seed stored per participant) ----------
 
@@ -194,6 +195,9 @@ export async function startAttempt(comp: any, participant: any) {
     values (${participant.id}, now(), now() + make_interval(secs => ${limitSec}), ${sql.json(state)})
     on conflict (participant_id, attempt_number) do nothing
     returning *`;
+  if (rows[0]) {
+    await logEvent("attempt_started", { competitionId: comp.id, participantId: participant.id });
+  }
   return rows[0] ?? await currentAttempt(participant.id);
 }
 
@@ -218,6 +222,12 @@ export async function finalizeAttempt(attempt: any, comp: any, timedOut: boolean
       duration_ms = (extract(epoch from (least(now(), deadline_at) - started_at)) * 1000)::int
     where id = ${attempt.id} and status = 'in_progress'
     returning *`;
+  if (rows[0]) {
+    await logEvent("attempt_finished", {
+      participantId: attempt.participant_id,
+      props: { score, duration_ms: rows[0].duration_ms, timed_out: timedOut },
+    });
+  }
   return rows[0] ?? await sql`select * from attempts where id = ${attempt.id}`.then((r) => r[0]);
 }
 

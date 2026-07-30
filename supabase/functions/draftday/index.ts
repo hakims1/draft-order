@@ -18,6 +18,7 @@ import {
   startAttempt,
   submitAnswer,
 } from "./logic.ts";
+import { checkGate, logEvent } from "./gates.ts";
 
 const FN = "draftday";
 // Public site (GitHub Pages). Share/results URLs are built against this.
@@ -104,7 +105,15 @@ async function memberState(c: any, comp: any, light = false) {
   if (attempt?.status === "finished") {
     payload.result = { score: Number(attempt.score), total, duration_ms: attempt.duration_ms };
     if (comp.type === "wonderlic" && !light) {
-      payload.missed = await missedQuestions(attempt, comp);
+      // Answer-key review sits behind a (currently open) monetization gate,
+      // keyed to the commissioner's account. log:false — this path is polled.
+      const gate = await checkGate("missed_review", comp.admin_id, { log: false });
+      if (gate.open) {
+        payload.missed = await missedQuestions(attempt, comp);
+      } else {
+        payload.missed_locked = true;
+        payload.missed_paywall = gate.paywall;
+      }
     }
   }
 
@@ -198,6 +207,7 @@ app.post("/c/:token/join", async (c) => {
   const { name, real_name } = await c.req.json().catch(() => ({}));
   const res: any = await joinCompetition(comp, String(name ?? ""), String(real_name ?? ""));
   if (res.error) return c.json({ error: res.error });
+  await logEvent("member_joined", { competitionId: comp.id, participantId: res.participant.id, props: { type: comp.type } });
   return c.json({ ok: true, participant_token: res.participant.session_token });
 });
 
@@ -351,6 +361,11 @@ app.post("/api/admin/league/:id/competitions", async (c) => {
   if (!admin) return c.json({ error: "unauthorized" }, 401);
   const league = await ownedLeague(admin.id, c.req.param("id"));
   if (!league) return c.json({ error: "not found" }, 404);
+  const [{ n: existingComps }] = await sql`
+    select count(*)::int as n from competitions where league_id = ${league.id}`;
+  if (existingComps > 0) {
+    return c.json({ error: "This league already has a competition. One competition per league for now." });
+  }
   const b = await c.req.json().catch(() => ({}));
   const type = String(b.type) === "random_order" ? "random_order" : "wonderlic";
   const config = type === "wonderlic"
@@ -391,10 +406,17 @@ app.post("/api/admin/competition/:id/activate", async (c) => {
   const comp = await ownedCompetition(admin.id, c.req.param("id"));
   if (!comp) return c.json({ error: "not found" }, 404);
   if (comp.status === "draft") {
+    // Paywall trigger point A: launching a Wonderlic competition.
+    // Currently open for everyone; flip via app_config, no redeploy needed.
+    if (comp.type === "wonderlic") {
+      const gate = await checkGate("activate_wonderlic", admin.id, { competitionId: comp.id });
+      if (!gate.open) return c.json({ paywall: gate.paywall });
+    }
     await sql`
       update competitions set status = 'active', activated_at = now(),
         share_token = ${randomToken(18)}, results_token = ${randomToken(18)}
       where id = ${comp.id}`;
+    await logEvent("competition_activated", { adminId: admin.id, competitionId: comp.id, props: { type: comp.type } });
   }
   return c.json({ ok: true });
 });
@@ -408,6 +430,36 @@ app.post("/api/admin/competition/:id/close", async (c) => {
   return c.json({ ok: true });
 });
 
+// Remove a duplicate/mistaken entry. Allowed until the competition is closed.
+// In random mode any existing draw is voided so it re-runs when the league
+// fills again — otherwise a deleted slot could never be refilled.
+app.post("/api/admin/competition/:id/participants/:pid/delete", async (c) => {
+  const admin = await requireAdmin(c);
+  if (!admin) return c.json({ error: "unauthorized" }, 401);
+  const comp = await ownedCompetition(admin.id, c.req.param("id"));
+  if (!comp) return c.json({ error: "not found" }, 404);
+  if (comp.status === "closed") return c.json({ error: "Competition is closed — the order is final." });
+  const deleted = await sql`
+    delete from participants
+    where id = ${c.req.param("pid")} and competition_id = ${comp.id}
+    returning display_name`.catch(() => []);
+  if (!deleted.length) return c.json({ error: "Entry not found." });
+  if (comp.type === "random_order") {
+    await sql.begin(async (tx) => {
+      await tx`
+        delete from attempts a using participants p
+        where a.participant_id = p.id and p.competition_id = ${comp.id}`;
+      await tx`
+        update competitions set config = config - 'order_generated'
+        where id = ${comp.id}`;
+    });
+  }
+  await logEvent("participant_deleted", {
+    adminId: admin.id, competitionId: comp.id, props: { name: deleted[0].display_name },
+  });
+  return c.json({ ok: true });
+});
+
 app.get("/api/admin/competition/:id/live", async (c) => {
   const admin = await requireAdmin(c);
   if (!admin) return c.json({ error: "unauthorized" }, 401);
@@ -415,7 +467,7 @@ app.get("/api/admin/competition/:id/live", async (c) => {
   if (!comp) return c.json({ error: "not found" }, 404);
   await sweepExpired(comp);
   const rows = await sql`
-    select p.display_name, p.real_name, p.is_dnf, a.status as astatus, a.score, a.duration_ms, a.started_at
+    select p.id, p.display_name, p.real_name, p.is_dnf, a.status as astatus, a.score, a.duration_ms, a.started_at
     from participants p
     left join attempts a on a.participant_id = p.id
     where p.competition_id = ${comp.id}
@@ -426,6 +478,7 @@ app.get("/api/admin/competition/:id/live", async (c) => {
     member_count: comp.member_count,
     status: comp.status,
     participants: rows.map((r: any) => ({
+      id: r.id,
       name: r.display_name,
       real_name: r.real_name,
       dnf: r.is_dnf,

@@ -123,3 +123,36 @@ series, arithmetic word problems, logical deduction, proverb meaning, spatial/pa
 calendar reasoning, and sentence disambiguation. Difficulty mix: 10 easy / 12 medium /
 8 hard. Add a new bank by inserting rows with `bank_version = 2` and setting
 `config.bank_version` on new competitions; old results are untouched.
+
+## Monetization gates & A/B experiments
+
+Nothing is paywalled today, but the infrastructure is live. Trigger points
+("gates") are checked server-side and driven by the `app_config` row
+`monetization` — flipping an experiment needs no deploy:
+
+```sql
+-- turn the placement experiment on
+update app_config set value =
+  jsonb_set(jsonb_set(jsonb_set(value,
+    '{experiments,paywall_placement_v1,enabled}', 'true'),
+    '{gates,activate_wonderlic,mode}', '"experiment"'),
+    '{gates,missed_review,mode}', '"experiment"'),
+  updated_at = now()
+where key = 'monetization';
+```
+
+- **Gates:** `activate_wonderlic` (Begin Competition for the test) and
+  `missed_review` (post-test answer key). Modes: `open` / `paid` / `experiment`.
+- **Experiment `paywall_placement_v1`:** admins are hash-bucketed once
+  (sticky, persisted in `admin_experiments`) into `gate_at_activation`
+  (paywall before launch) or `upsell_later` (free launch, answer key gated).
+- **Entitlements:** a row in `entitlements` (product `pro`) passes every gate —
+  this is where a Stripe webhook will write when payments exist.
+- **Funnel events** land in `events`: `gate_hit`, `experiment_assigned`,
+  `competition_activated`, `member_joined`, `attempt_started`,
+  `attempt_finished`, `participant_deleted`.
+- Paywall copy lives in config (`paywall_copy`) and is rendered verbatim by the
+  client, so messaging is testable without a frontend deploy.
+- Warning from testing: enabling a gate affects **existing live leagues**
+  immediately (an `upsell_later` admin's league loses the answer key mid-season).
+  Scope future experiments to new signups if that matters.
