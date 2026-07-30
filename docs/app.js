@@ -4,6 +4,29 @@ const API = "https://bwxsuybqhgocmwncxzlz.supabase.co/functions/v1/draftday";
 const SITE = location.origin + location.pathname.replace(/index\.html$/, "");
 
 const app = () => document.getElementById("app");
+const landingEl = () => document.getElementById("landing");
+let landingWired = false;
+
+/* Display names only — the enum values in the DB/API are unchanged. */
+const TYPE_NAME = (t) =>
+  t === "wonderlic" ? "Draft Day Aptitude Test" : t === "trex" ? "T-Rex Runner" : "Random Order";
+
+/* Group-chat messages. Shared by the landing preview and the live share card. */
+const MSGS_TEST = [
+  "Yooooo\n\nso instead of pulling names out of a stupid hat this year, how about we compete for our draft picks\n\n6 minute test, 30 questions, everyone gets 1 try. highest score picks first. whoever finishes last picks 12th and has to live with it\n\ndo it whenever you want, it's on your phone. link below",
+  "new rule for this year\n\nno hat, no randomizer. we're competing for our picks\n\n6 min test. 30 questions. 1 try each. highest score picks first, last place picks last\n\nlet's find out who actually knows anything in this group",
+  "draft order is a competition this year. 6 min test, 1 try each, highest score picks first. no hat, no randomizer. takes six minutes on your phone, link below"
+];
+const MSGS_DRAW = [
+  "Yooooo\n\ndraft order is getting drawn on a link this year instead of somebody's kitchen table\n\neveryone taps it and locks their name in. the second the last person is in, the order draws itself and we all see it at the same time\n\ntakes ten seconds, do it whenever. link below",
+  "new rule for this year\n\nno hat, no arguing about who watched the draw. everyone locks in on the link and the order pops the moment the last name is in\n\nwhatever it spits out is the board. no re-rolls",
+  "draft order draw is happening on this link. lock your name in, order gets drawn once everyone's in, everybody sees it live. ten seconds"
+];
+const MSGS_TREX = [
+  "Yooooo\n\ndraft order this year = the dinosaur game. yes, that one\n\neveryone gets 3 practice runs then 1 run that counts. highest score picks first, last place lives with it\n\ntakes five minutes on your phone, link below",
+  "new rule for this year\n\nno hat, no randomizer. draft order is decided by the dino runner\n\n3 practice runs, then 1 real one. highest score picks first, last place picks last\n\nwarm up first. you'll need it",
+  "draft order = dino game this year. 3 practice runs, 1 that counts, highest score picks first. five minutes on your phone, link below"
+];
 const wrap = () => document.getElementById("wrap");
 const $ = (s, el) => (el || document).querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -591,7 +614,7 @@ async function adminHome() {
   let d;
   try { d = await aapi("/api/admin/dashboard"); } catch { return; }
   wrap().classList.add("wide");
-  const typeName = (t) => t === "wonderlic" ? "Wonderlic Test" : t === "trex" ? "T-Rex Runner" : "Random Order";
+  const typeName = TYPE_NAME;
   const statusTag = (s) => `<span class="tag ${s === "active" ? "" : s === "closed" ? "red" : "gray"}">${s}</span>`;
   app().innerHTML = `
     <div style="text-align:left">
@@ -688,7 +711,7 @@ async function compView(id) {
   if (d.error) return adminHome();
   wrap().classList.add("wide");
   const c = d.competition, l = d.league;
-  const typeName = c.type === "wonderlic" ? "Wonderlic Test" : c.type === "trex" ? "T-Rex Runner" : "Random Order";
+  const typeName = TYPE_NAME(c.type);
   const shareUrl = c.share_token ? SITE + "#/c/" + c.share_token : null;
   const resultsUrl = c.results_token ? SITE + "#/r/" + c.results_token : null;
 
@@ -701,7 +724,20 @@ async function compView(id) {
         <button class="btn" id="beginBtn">Begin competition</button>
       </div>`;
   } else {
-    block = `
+    const msgs = c.type === "random_order" ? MSGS_DRAW : c.type === "trex" ? MSGS_TREX : MSGS_TEST;
+    const shareCard = shareUrl ? `
+      <div class="card">
+        <h2>The group chat message</h2>
+        <div class="mut" style="margin-top:4px">Written to be pasted, not admired. Your live link is already on the end of it.</div>
+        <div class="row" style="margin-top:14px">
+          <button class="btn ghost small sel" data-share-tone="0">How you'd text it</button>
+          <button class="btn ghost small" data-share-tone="1">Harder</button>
+          <button class="btn ghost small" data-share-tone="2">Short</button>
+        </div>
+        <div id="shareBubble" style="white-space:pre-line;background:#1F3A63;color:#EDF1FA;border-radius:19px 19px 19px 5px;padding:13px 16px;margin-top:14px;font-size:16px;line-height:1.5;word-break:break-word">${esc(msgs[0] + "\n\n" + shareUrl)}</div>
+        <button class="btn" id="shareCopyBtn" data-copy="${esc(msgs[0] + "\n\n" + shareUrl)}" data-copy-label="Copy message">Copy message</button>
+      </div>` : "";
+    block = shareCard + `
       <div class="card">
         <div class="row spread"><h2>Share link</h2><button class="btn ghost small" data-copy="${esc(shareUrl)}">Copy link</button></div>
         <div class="linkbox">${esc(shareUrl)}</div>
@@ -741,10 +777,25 @@ async function compView(id) {
     </div></div>`;
 
   document.querySelectorAll("[data-copy]").forEach((b) => {
+    const label = b.dataset.copyLabel || "Copy link";
     b.onclick = async () => {
-      try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = "Copied!"; setTimeout(() => (b.textContent = "Copy link"), 1500); } catch {}
+      try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = "Copied!"; setTimeout(() => (b.textContent = label), 1500); } catch {}
     };
   });
+  // Tone tabs on the share-message card keep the bubble and copy payload in sync.
+  const shareMsgs = c.type === "random_order" ? MSGS_DRAW : c.type === "trex" ? MSGS_TREX : MSGS_TEST;
+  if ($("#shareBubble")) {
+    document.querySelectorAll("[data-share-tone]").forEach((t) => {
+      t.onclick = () => {
+        const i = Number(t.dataset.shareTone);
+        document.querySelectorAll("[data-share-tone]").forEach((o) => o.classList.toggle("sel", o === t));
+        const full = shareMsgs[i] + "\n\n" + shareUrl;
+        $("#shareBubble").textContent = full;
+        const cb = $("#shareCopyBtn");
+        if (cb) { cb.dataset.copy = full; cb.textContent = "Copy message"; }
+      };
+    });
+  }
   $("#lsave").onclick = async () => {
     await aapi("/api/admin/league/" + id, {
       name: $("#lname").value, season_year: Number($("#lyear").value), member_count: Number($("#lmembers").value),
@@ -834,17 +885,148 @@ async function metricsView() {
     </div></div>`;
 }
 
+/* ================= landing page ================= */
+function landingView() {
+  clearTimers();
+  const L = landingEl();
+  if (!L) return renderLogin();
+  wrap().classList.remove("wide");
+  wrap().classList.add("landing");
+  app().innerHTML = "";
+  app().hidden = true;
+  L.hidden = false;
+  wireLanding();
+}
+
+function wireLanding() {
+  if (landingWired) return;
+  landingWired = true;
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const L = landingEl();
+  const q = (s) => L.querySelector(s);
+
+  /* --- sample test (5 original questions, 60 seconds) --- */
+  const QS = [
+    { q: "Notebooks sell for 35 cents each. What will 3 notebooks cost?", o: ["95 cents", "$1.05", "$1.15", "$1.20"], a: 1 },
+    { q: "Which of these is least like the others?", o: ["Oak", "Maple", "Granite", "Birch"], a: 2 },
+    { q: "Assume the first two statements are true. Every runner on the squad owns spikes. Dana is on the squad. So: Dana owns spikes. That is —", o: ["True", "False", "Not certain", "Impossible to say"], a: 0 },
+    { q: "In 20 days a shop ships 15 orders. At that rate, how many orders in 60 days?", o: ["40", "45", "50", "55"], a: 1 },
+    { q: "OAR is to ROWBOAT as PEDAL is to —", o: ["Bicycle", "Shoe", "Road", "Wheel"], a: 0 }
+  ];
+  let idx = 0, score = 0, left = 60, timer = null;
+  const elStart = q("#tStart"), elPlay = q("#tPlay"), elRes = q("#tResult"),
+        elClock = q("#testClock"), elProg = q("#tProg"), elQ = q("#qText"),
+        elOpts = q("#qOpts"), elCount = q("#qCount");
+  const fmt = (s) => Math.floor(s / 60) + ":" + String(Math.max(0, s % 60)).padStart(2, "0");
+
+  function paint() {
+    const item = QS[idx];
+    elCount.textContent = "Question " + (idx + 1) + " of " + QS.length;
+    elQ.textContent = item.q;
+    elOpts.innerHTML = "";
+    item.o.forEach((text, i) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "lp-opt";
+      b.innerHTML = '<span class="lp-k">' + "ABCD"[i] + "</span><span></span>";
+      b.lastChild.textContent = text;
+      b.addEventListener("click", () => answer(b, i, item.a));
+      elOpts.appendChild(b);
+    });
+    elProg.style.width = (idx / QS.length * 100) + "%";
+  }
+  function answer(btn, picked, correct) {
+    Array.prototype.forEach.call(elOpts.children, (c) => { c.disabled = true; });
+    if (picked === correct) { score++; btn.classList.add("lp-right"); }
+    else { btn.classList.add("lp-wrong"); elOpts.children[correct].classList.add("lp-right"); }
+    setTimeout(() => { idx++; if (idx >= QS.length) finish(); else paint(); }, reduce ? 120 : 420);
+  }
+  function tick() {
+    left--; elClock.textContent = fmt(left);
+    if (left <= 15) elClock.classList.add("lp-hot");
+    if (left <= 0) finish();
+  }
+  function finish() {
+    clearInterval(timer);
+    elPlay.hidden = true; elStart.hidden = true; elRes.hidden = false;
+    elProg.style.width = "100%";
+    q("#scoreVal").textContent = score;
+    q("#timeVal").textContent = fmt(60 - left);
+    elCount.textContent = "Complete";
+    elClock.classList.remove("lp-hot");
+    elClock.textContent = fmt(Math.max(0, left));
+  }
+  q("#startBtn").addEventListener("click", () => {
+    elStart.hidden = true; elPlay.hidden = false;
+    paint(); elClock.textContent = fmt(left);
+    timer = setInterval(tick, 1000);
+    addTimer(timer);
+  });
+
+  /* --- message preview: tone tabs only, no copy until a league exists --- */
+  const PREVIEW = MSGS_TEST.map((m) => m + "\n\n[your league's link]");
+  const msgEl = q("#msg");
+  msgEl.textContent = PREVIEW[0];
+  L.querySelectorAll(".lp-tone").forEach((t) => {
+    t.addEventListener("click", () => {
+      L.querySelectorAll(".lp-tone").forEach((o) => o.setAttribute("aria-pressed", o === t ? "true" : "false"));
+      msgEl.textContent = PREVIEW[Number(t.dataset.tone)];
+    });
+  });
+
+  /* --- "send it to your league" jump --- */
+  L.querySelectorAll("[data-copy-jump],[data-jump]").forEach((b) => {
+    b.addEventListener("click", () => {
+      const target = L.querySelector(b.dataset.jump || "#send");
+      if (!target) return;
+      const top = target.getBoundingClientRect().top + window.pageYOffset - 10;
+      window.scrollTo({ top, behavior: reduce ? "auto" : "smooth" });
+    });
+  });
+
+  /* --- scroll reveals --- */
+  const revealAll = () => L.querySelectorAll(".lp-card, .lp-plate").forEach((k) => k.classList.add("lp-in"));
+  if ("IntersectionObserver" in window && !reduce) {
+    let fired = false;
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (!e.isIntersecting) return;
+        fired = true;
+        Array.prototype.forEach.call(e.target.children, (k, i) => {
+          setTimeout(() => k.classList.add("lp-in"), i * 110);
+        });
+        io.unobserve(e.target);
+      });
+    }, { threshold: 0.14 });
+    L.querySelectorAll(".lp-js-reveal").forEach((g) => io.observe(g));
+    // safety net: never leave real content stuck at opacity 0
+    setTimeout(() => { if (!fired) revealAll(); }, 1400);
+  } else {
+    revealAll();
+  }
+}
+
 /* ================= router ================= */
 function route() {
   clearTimers();
+  const L = landingEl();
+  if (L) L.hidden = true;
+  app().hidden = false;
+  wrap().classList.remove("landing");
   const h = location.hash;
   let m;
+  // Member links first: a group-chat link must never hit the landing page.
   if ((m = h.match(/^#\/c\/([\w-]+)/))) return memberView(m[1]);
   if ((m = h.match(/^#\/r\/([\w-]+)/))) return resultsView(m[1]);
+  if (h.match(/^#\/landing/)) return landingView();
+  if (h.match(/^#\/login/)) return localStorage.getItem("adm") ? adminHome() : renderLogin();
   if (h.match(/^#\/admin\/signup/)) return localStorage.getItem("adm") ? adminHome() : renderLogin("", "signup");
   if (h.match(/^#\/admin\/metrics/)) return metricsView();
   if ((m = h.match(/^#\/admin\/league\/([\w-]+)/))) return leagueView(m[1]);
   if ((m = h.match(/^#\/admin\/comp\/([\w-]+)/))) return compView(m[1]);
+  if (h === "" || h === "#" || h === "#/") {
+    if (localStorage.getItem("adm")) { location.hash = "#/admin"; return; }
+    return landingView();
+  }
   return adminHome();
 }
 window.addEventListener("hashchange", route);

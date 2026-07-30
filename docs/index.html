@@ -3,19 +3,380 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Draft Order Competition</title>
+<title>The Combine — Draft Order Competition</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- app.css must be the FIRST stylesheet: the embedded t-rex game injects
      keyframes into document.styleSheets[0], which throws on cross-origin sheets. -->
-<link rel="stylesheet" href="./app.css?v=10">
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./app.css?v=12">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./landing.css?v=12">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🏈</text></svg>">
 </head>
 <body>
 <div class="wrap" id="wrap">
   <div id="app" class="center" style="padding-top:40px"><div class="mut">Loading…</div></div>
 </div>
-<script src="./app.js?v=10"></script>
+<div id="landing" hidden>
+<!-- ============ 1. HERO ============ -->
+<header class="lp-hero">
+  <div class="lp-stage" aria-hidden="true">
+    <div class="lp-spot"></div>
+    <svg class="lp-truss" viewBox="0 0 1200 56" preserveAspectRatio="none" aria-hidden="true">
+      <g stroke="#8C7231" stroke-width="1.4" fill="none">
+        <line x1="0" y1="10" x2="1200" y2="10"/><line x1="0" y1="40" x2="1200" y2="40"/>
+        <path d="M0 40 L40 10 L80 40 L120 10 L160 40 L200 10 L240 40 L280 10 L320 40 L360 10 L400 40 L440 10 L480 40 L520 10 L560 40 L600 10 L640 40 L680 10 L720 40 L760 10 L800 40 L840 10 L880 40 L920 10 L960 40 L1000 10 L1040 40 L1080 10 L1120 40 L1160 10 L1200 40"/>
+      </g>
+      <g fill="#8C7231">
+        <rect x="180" y="40" width="14" height="16"/><rect x="600" y="40" width="14" height="16"/><rect x="1010" y="40" width="14" height="16"/>
+      </g>
+    </svg>
+    <div class="lp-bigboard"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  </div>
+
+  <div class="lp-shell">
+    <nav class="lp-nav">
+      <div class="lp-logo"><span class="lp-lm"><span>C</span></span><b>The Combine</b></div>
+      <div style="display:flex;align-items:center;gap:18px">
+        <a class="lp-navlink" href="#/login">Log in</a>
+        <a class="lp-navlink" href="#/login" style="color:var(--brass)">Get started</a>
+      </div>
+    </nav>
+
+    <div class="lp-herobody">
+      <div class="lp-clockwrap">
+        <div class="lp-clock lp-num" id="heroClock" aria-label="six minutes">6<span class="lp-cl">:</span>00</div>
+        <div class="lp-clocklab">One test<br>Six minutes<br>One try</div>
+      </div>
+      <h1>Earn<br><em>your pick</em></h1>
+      <p class="lp-body lp-sub">Your league takes one 6 minute test. Highest score gets to pick their position first. Nobody gets handed the top pick this year without earning it.</p>
+      <div class="lp-heroCta">
+        <a class="lp-btn" id="getStarted" href="#/login">Get started</a>
+        <button class="lp-btn lp-outline" type="button" data-jump="#test" style="margin-top:10px">Try the 60 second version</button>
+        <button class="lp-sendline" type="button" data-copy-jump>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke-width="1.8"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M15 5H5a2 2 0 0 0-2 2v10"/></svg>
+          Already sold? <u>Send it to your league</u>
+        </button>
+      </div>
+    </div>
+
+    <div class="lp-stagepic" aria-hidden="true">
+      <svg viewBox="0 0 520 210" preserveAspectRatio="xMidYMax meet">
+        <defs>
+          <linearGradient id="lit" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#FFB01F" stop-opacity=".20"/><stop offset="1" stop-color="#FFB01F" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="lect" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#152039"/><stop offset="1" stop-color="#0B1120"/>
+          </linearGradient>
+          <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#152039" stop-opacity=".9"/><stop offset="1" stop-color="#0A0E1A" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <!-- spotlight cones -->
+        <polygon points="150,0 210,0 300,168 205,168" fill="url(#lit)"/>
+        <polygon points="310,0 370,0 315,168 220,168" fill="url(#lit)"/>
+        <!-- backdrop big board -->
+        <rect x="74" y="16" width="372" height="116" fill="#0D1424" stroke="#8C7231" stroke-width="1"/>
+        <g fill="#152039">
+          <rect x="84" y="26" width="352" height="9"/><rect x="84" y="40" width="352" height="9"/>
+          <rect x="84" y="54" width="352" height="9"/><rect x="84" y="68" width="352" height="9"/>
+          <rect x="84" y="82" width="352" height="9"/><rect x="84" y="96" width="352" height="9"/>
+          <rect x="84" y="110" width="352" height="9"/>
+        </g>
+        <g fill="#8C7231" opacity=".55">
+          <rect x="84" y="26" width="46" height="9"/><rect x="84" y="40" width="30" height="9"/>
+          <rect x="84" y="54" width="38" height="9"/><rect x="84" y="68" width="24" height="9"/>
+        </g>
+        <!-- truss uprights -->
+        <g stroke="#8C7231" stroke-width="1.2" fill="none" opacity=".85">
+          <path d="M60 4 V150 M70 4 V150 M60 14 L70 26 M70 14 L60 26 M60 38 L70 50 M70 38 L60 50 M60 62 L70 74 M70 62 L60 74 M60 86 L70 98 M70 86 L60 98 M60 110 L70 122 M70 110 L60 122 M60 134 L70 146 M70 134 L60 146"/>
+          <path d="M450 4 V150 M460 4 V150 M450 14 L460 26 M460 14 L450 26 M450 38 L460 50 M460 38 L450 50 M450 62 L460 74 M460 62 L450 74 M450 86 L460 98 M460 86 L450 98 M450 110 L460 122 M460 110 L450 122 M450 134 L460 146 M460 134 L450 146"/>
+        </g>
+        <!-- stage floor -->
+        <rect x="0" y="168" width="520" height="42" fill="url(#floor)"/>
+        <line x1="0" y1="168" x2="520" y2="168" stroke="#8C7231" stroke-width="1.2" opacity=".8"/>
+        <!-- carpet -->
+        <polygon points="196,168 324,168 356,210 164,210" fill="#4A1620" opacity=".55"/>
+        <!-- lectern -->
+        <path d="M232 168 L236 116 L284 116 L288 168 Z" fill="url(#lect)" stroke="#8C7231" stroke-width="1.2"/>
+        <line x1="234" y1="130" x2="286" y2="130" stroke="#8C7231" stroke-width="1" opacity=".6"/>
+        <rect x="228" y="110" width="64" height="8" fill="#C9A44C"/>
+        <text x="260" y="152" text-anchor="middle" font-family="Anton, Impact, sans-serif" font-size="15" fill="#C9A44C" letter-spacing="1">1.01</text>
+        <!-- microphone -->
+        <g stroke="#8C7231" stroke-width="1.2" fill="none"><path d="M260 110 C 250 100 252 92 244 88"/><circle cx="242" cy="87" r="2.6" fill="#8C7231"/></g>
+        <!-- stanchions + rope -->
+        <g stroke="#8C7231" stroke-width="1.4" fill="none" opacity=".9">
+          <line x1="126" y1="146" x2="126" y2="176"/><circle cx="126" cy="143" r="3" fill="#8C7231"/>
+          <line x1="394" y1="146" x2="394" y2="176"/><circle cx="394" cy="143" r="3" fill="#8C7231"/>
+          <path d="M126 150 Q 150 168 174 150" opacity=".7"/>
+          <path d="M346 150 Q 370 168 394 150" opacity=".7"/>
+        </g>
+      </svg>
+    </div>
+  </div>
+</header>
+
+<div class="lp-ticker" aria-hidden="true">
+  <div class="lp-track">
+    <span>Slot 1 · <b>Earned</b></span><span>30 questions</span><span>6:00 on the clock</span><span>One attempt each</span><span>No accounts</span><span>Slot 12 · <b>Also earned</b></span><span>Take it on your phone</span><span>Nobody gets handed the 1.01</span>
+    <span>Slot 1 · <b>Earned</b></span><span>30 questions</span><span>6:00 on the clock</span><span>One attempt each</span><span>No accounts</span><span>Slot 12 · <b>Also earned</b></span><span>Take it on your phone</span><span>Nobody gets handed the 1.01</span>
+  </div>
+</div>
+
+<!-- ============ 2. PROBLEM ============ -->
+<section class="lp-sec">
+  <div class="lp-shell">
+    <div class="lp-kicker">The way it works now</div>
+    <div class="lp-split">
+      <div class="lp-randomizer" aria-hidden="true">
+        <div class="lp-rt">Draft order randomizer — shuffling</div>
+        <div class="lp-slots">
+          <div><em>Pick 1</em><span class="lp-shuf">— — —</span></div>
+          <div><em>Pick 2</em><span class="lp-shuf">— — —</span></div>
+          <div><em>Pick 3</em><span>Manager 07</span></div>
+          <div><em>Pick 4</em><span class="lp-shuf">— — —</span></div>
+          <div><em>Pick 5</em><span>Manager 02</span></div>
+        </div>
+        <div class="lp-rbtn">Shuffle again</div>
+      </div>
+      <div>
+        <h2 class="lp-stitle" style="margin-top:14px">A spreadsheet used to decide your season</h2>
+        <p class="lp-body" style="margin-top:20px">Twelve people put real money in. Somebody spent four hours on rankings. Then a number generator handed out the picks and the league year started with a shrug. <b>The most consequential moment before kickoff, and nobody competed for it.</b></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3. SAMPLE TEST ============ -->
+<section class="lp-sec" id="test">
+  <div class="lp-shell">
+    <div class="lp-kicker">Try it yourself</div>
+    <h2 class="lp-stitle lp-sm" style="margin-top:12px">Five questions. Sixty seconds.</h2>
+
+    <div class="lp-test" style="margin-top:26px">
+      <div class="lp-tbar">
+        <div class="lp-lab">Sample test · <span id="qCount">5 questions</span></div>
+        <div class="lp-tclock lp-num" id="testClock">0:60</div>
+      </div>
+      <div class="lp-tprog"><i id="tProg"></i></div>
+
+      <div class="lp-tstart" id="tStart">
+        <h3 style="font-size:clamp(26px,7vw,36px)">No signup. No email.</h3>
+        <p>The real thing is 30 questions in six minutes. This is a taste of it, and the clock is not kind.</p>
+        <button class="lp-btn" id="startBtn" type="button">Start the 60 second test</button>
+      </div>
+
+      <div class="lp-tbodyx" id="tPlay" hidden>
+        <div class="lp-q" id="qText">—</div>
+        <div class="lp-opts" id="qOpts"></div>
+      </div>
+
+      <div class="lp-result" id="tResult" hidden>
+        <div class="lp-kicker">Your score</div>
+        <div class="lp-big lp-num"><span id="scoreVal">0</span><small>/5</small></div>
+        <div class="lp-vs">Running visitor average <b class="lp-num" id="avgVal">3.1</b> · you finished in <b class="lp-num" id="timeVal">0:00</b></div>
+        <div class="lp-turn">Think you would beat <em>your league?</em> There is one way to find out.</div>
+        <a class="lp-btn lp-brass" href="#/login" style="max-width:400px;margin:0 auto">Get started</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4. HOW IT WORKS ============ -->
+<section class="lp-sec">
+  <div class="lp-shell">
+    <div class="lp-kicker">How it works</div>
+    <h2 class="lp-stitle lp-sm" style="margin-top:12px">Three steps, then you're done</h2>
+    <div class="lp-steps lp-js-reveal">
+      <div class="lp-card"><h3>Set your league</h3><p>Name it, set the number of members, pick the competition.</p></div>
+      <div class="lp-card"><h3>Drop the link in the group chat</h3><p>No accounts and no app for anyone. They tap the link and enter a name.</p></div>
+      <div class="lp-card"><h3>Everyone competes on their own time</h3><p>Nobody has to be online at the same time. The clock starts when they start.</p></div>
+    </div>
+    <p class="lp-async">Getting twelve adults in one room in August <b>does not happen.</b> No live lottery, no Zoom call, no scheduling thread that dies on day two. Everyone takes it whenever they want, and the board fills in as they finish.</p>
+  </div>
+</section>
+
+<!-- ============ 5. WHAT YOUR LEAGUE SEES ============ -->
+<section class="lp-sec">
+  <div class="lp-shell">
+    <div class="lp-kicker">What your league sees</div>
+    <h2 class="lp-stitle lp-sm" style="margin-top:12px">Three taps, start to finish</h2>
+    <div class="lp-phones">
+      <div>
+        <div class="lp-phone"><div class="lp-pscreen">
+          <div class="lp-pnotch"></div>
+          <div class="lp-plab">The Gridiron Gauntlet · 2026</div>
+          <div style="font-family:var(--cond);font-size:19px;margin-top:14px;line-height:1.25">Who's taking this test?</div>
+          <div class="lp-pfield lp-ph">Your name</div>
+          <div style="font-size:11.5px;color:var(--dimmer);margin-top:12px">One attempt. Starts when you tap.</div>
+          <div class="lp-pbtn">I'm ready</div>
+        </div></div>
+        <div class="lp-pcap">Enter a name</div>
+      </div>
+      <div>
+        <div class="lp-phone"><div class="lp-pscreen">
+          <div class="lp-pnotch"></div>
+          <div class="lp-plab">Question 14 of 30</div>
+          <div class="lp-pclock lp-num">3:42</div>
+          <div class="lp-pq">In 30 days a team plays 18 games. At that rate, how many games in 45 days?</div>
+          <div class="lp-popt">A · 24</div>
+          <div class="lp-popt">B · 27</div>
+          <div class="lp-popt">C · 30</div>
+          <div class="lp-popt">D · 32</div>
+          <div class="lp-pbtn" style="margin-top:14px">Next</div>
+        </div></div>
+        <div class="lp-pcap">Clock running</div>
+      </div>
+      <div>
+        <div class="lp-phone"><div class="lp-pscreen">
+          <div class="lp-pnotch"></div>
+          <div class="lp-plab">Time</div>
+          <div class="lp-pscore lp-num">23<span style="font-size:22px;color:var(--dimmer)">/30</span></div>
+          <div style="font-family:var(--cond);font-size:17px;margin-top:12px;line-height:1.3">Currently 3rd of 12.<br><span style="color:var(--dim)">Four managers left to go.</span></div>
+          <div class="lp-pbtn">See the board</div>
+        </div></div>
+        <div class="lp-pcap">Score, then wait</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 6. THE REVEAL ============ -->
+<section class="lp-sec">
+  <div class="lp-shell">
+    <div class="lp-kicker">The reveal</div>
+    <h2 class="lp-stitle lp-sm" style="margin-top:12px">The order gets earned in front of everyone</h2>
+    <p class="lp-body" style="margin-top:18px;max-width:44ch">The board fills from the bottom up. Slot twelve first. Slot one last, and everybody is watching when it lands.</p>
+    <div class="lp-board lp-js-reveal" id="revealBoard">
+      <div class="lp-plate lp-twelve"><div class="lp-slot">1.12</div><div class="lp-who">Handcuff Harry</div><div class="lp-sc">14</div></div>
+      <div class="lp-plate"><div class="lp-slot">1.11</div><div class="lp-who">Bye Week Bandit</div><div class="lp-sc">15</div></div>
+      <div class="lp-plate"><div class="lp-slot">1.10</div><div class="lp-who">Second Half Sam</div><div class="lp-sc">16</div></div>
+      <div class="lp-plate"><div class="lp-slot">1.09</div><div class="lp-who">The Autodrafter</div><div class="lp-sc">17</div></div>
+      <div class="lp-plate"><div class="lp-slot">1.08</div><div class="lp-who">Flex Appeal</div><div class="lp-sc">18</div></div>
+      <div class="lp-plate"><div class="lp-slot">1.07</div><div class="lp-who">Kicker Truther</div><div class="lp-sc">19</div></div>
+      <div class="lp-plate"><div class="lp-slot">1.06</div><div class="lp-who">Trade Veto Terry</div><div class="lp-sc">20</div></div>
+      <div class="lp-plate"><div class="lp-slot">1.05</div><div class="lp-who">Zero RB Zealot</div><div class="lp-sc">21</div></div>
+      <div class="lp-plate"><div class="lp-slot">1.04</div><div class="lp-who">Play Action Jackson</div><div class="lp-sc">22</div></div>
+      <div class="lp-plate"><div class="lp-slot">1.03</div><div class="lp-who">Waiver Wire Wolf</div><div class="lp-sc">24</div></div>
+      <div class="lp-plate"><div class="lp-slot">1.02</div><div class="lp-who">Deep League Dana</div><div class="lp-sc">26</div></div>
+      <div class="lp-plate lp-one"><div class="lp-slot">1.01</div><div class="lp-who">Tank Commander</div><div class="lp-sc">28</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 7. SEND IT ============ -->
+<section class="lp-sec lp-sendsec" id="send">
+  <div class="lp-shell">
+    <div class="lp-kicker">Send it to your league</div>
+    <h2 class="lp-stitle" style="margin-top:12px">You found it.<br>Now sell it.</h2>
+    <p class="lp-body" style="margin-top:20px;max-width:46ch">You do not have to be the commissioner to start this. Copy the message below, paste it in the group chat, and let the league argue about it.</p>
+
+    <div class="lp-tones" role="group" aria-label="Message tone">
+      <button class="lp-tone" type="button" data-tone="0" aria-pressed="true">How you'd text it</button>
+      <button class="lp-tone" type="button" data-tone="1" aria-pressed="false">Harder</button>
+      <button class="lp-tone" type="button" data-tone="2" aria-pressed="false">Short</button>
+    </div>
+
+    <div class="lp-thread">
+      <div class="lp-head">
+        <div class="lp-av">12</div>
+        <b>League chat</b>
+        <span>Today 9:41 PM</span>
+      </div>
+      <div class="lp-bubble" id="msg">…</div>
+      <div class="lp-bstamp">Delivered</div>
+      <p class="lp-keys" style="margin-top:14px;font-size:13px">You get this ready to paste the moment your league is set up.</p>
+    </div>
+
+    <p class="lp-keys">Not the commissioner? Set it up and hand the keys over. Admin can be transferred in one tap.</p>
+  </div>
+</section>
+
+<!-- ============ 8. OBJECTIONS ============ -->
+<section class="lp-sec">
+  <div class="lp-shell">
+    <div class="lp-kicker">What they'll ask you</div>
+    <h2 class="lp-stitle lp-sm" style="margin-top:12px">Answers for the group chat</h2>
+    <div class="lp-qa">
+      <div><h3>Does everyone need an account?</h3><p>No. They tap the link, type a name, and go.</p></div>
+      <div><h3>What if someone never takes it?</h3><p>The admin closes it and they pick last.</p></div>
+      <div><h3>What about people who are bad at tests?</h3><p>Still more fair than a number generator, which is bad at everything.</p></div>
+      <div><h3>What if someone cheats?</h3><p>You know these people. And they'd have to be smart enough to cheat, which is sort of the point.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 10. CLOSING ============ -->
+<section class="lp-closing">
+  <div class="lp-stage" aria-hidden="true">
+    <div class="lp-spot"></div>
+    <div class="lp-stagepic lp-closingpic"><svg viewBox="0 0 520 210" preserveAspectRatio="xMidYMax meet">
+        <defs>
+          <linearGradient id="lit" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#FFB01F" stop-opacity=".20"/><stop offset="1" stop-color="#FFB01F" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="lect" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#152039"/><stop offset="1" stop-color="#0B1120"/>
+          </linearGradient>
+          <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#152039" stop-opacity=".9"/><stop offset="1" stop-color="#0A0E1A" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <!-- spotlight cones -->
+        <polygon points="150,0 210,0 300,168 205,168" fill="url(#lit)"/>
+        <polygon points="310,0 370,0 315,168 220,168" fill="url(#lit)"/>
+        <!-- backdrop big board -->
+        <rect x="74" y="16" width="372" height="116" fill="#0D1424" stroke="#8C7231" stroke-width="1"/>
+        <g fill="#152039">
+          <rect x="84" y="26" width="352" height="9"/><rect x="84" y="40" width="352" height="9"/>
+          <rect x="84" y="54" width="352" height="9"/><rect x="84" y="68" width="352" height="9"/>
+          <rect x="84" y="82" width="352" height="9"/><rect x="84" y="96" width="352" height="9"/>
+          <rect x="84" y="110" width="352" height="9"/>
+        </g>
+        <g fill="#8C7231" opacity=".55">
+          <rect x="84" y="26" width="46" height="9"/><rect x="84" y="40" width="30" height="9"/>
+          <rect x="84" y="54" width="38" height="9"/><rect x="84" y="68" width="24" height="9"/>
+        </g>
+        <!-- truss uprights -->
+        <g stroke="#8C7231" stroke-width="1.2" fill="none" opacity=".85">
+          <path d="M60 4 V150 M70 4 V150 M60 14 L70 26 M70 14 L60 26 M60 38 L70 50 M70 38 L60 50 M60 62 L70 74 M70 62 L60 74 M60 86 L70 98 M70 86 L60 98 M60 110 L70 122 M70 110 L60 122 M60 134 L70 146 M70 134 L60 146"/>
+          <path d="M450 4 V150 M460 4 V150 M450 14 L460 26 M460 14 L450 26 M450 38 L460 50 M460 38 L450 50 M450 62 L460 74 M460 62 L450 74 M450 86 L460 98 M460 86 L450 98 M450 110 L460 122 M460 110 L450 122 M450 134 L460 146 M460 134 L450 146"/>
+        </g>
+        <!-- stage floor -->
+        <rect x="0" y="168" width="520" height="42" fill="url(#floor)"/>
+        <line x1="0" y1="168" x2="520" y2="168" stroke="#8C7231" stroke-width="1.2" opacity=".8"/>
+        <!-- carpet -->
+        <polygon points="196,168 324,168 356,210 164,210" fill="#4A1620" opacity=".55"/>
+        <!-- lectern -->
+        <path d="M232 168 L236 116 L284 116 L288 168 Z" fill="url(#lect)" stroke="#8C7231" stroke-width="1.2"/>
+        <line x1="234" y1="130" x2="286" y2="130" stroke="#8C7231" stroke-width="1" opacity=".6"/>
+        <rect x="228" y="110" width="64" height="8" fill="#C9A44C"/>
+        <text x="260" y="152" text-anchor="middle" font-family="Anton, Impact, sans-serif" font-size="15" fill="#C9A44C" letter-spacing="1">1.01</text>
+        <!-- microphone -->
+        <g stroke="#8C7231" stroke-width="1.2" fill="none"><path d="M260 110 C 250 100 252 92 244 88"/><circle cx="242" cy="87" r="2.6" fill="#8C7231"/></g>
+        <!-- stanchions + rope -->
+        <g stroke="#8C7231" stroke-width="1.4" fill="none" opacity=".9">
+          <line x1="126" y1="146" x2="126" y2="176"/><circle cx="126" cy="143" r="3" fill="#8C7231"/>
+          <line x1="394" y1="146" x2="394" y2="176"/><circle cx="394" cy="143" r="3" fill="#8C7231"/>
+          <path d="M126 150 Q 150 168 174 150" opacity=".7"/>
+          <path d="M346 150 Q 370 168 394 150" opacity=".7"/>
+        </g>
+      </svg></div>
+  </div>
+  <div class="lp-shell lp-inner">
+    <h2>The season starts <em>before</em> the season starts</h2>
+    <a class="lp-btn" href="#/login">Set up your league</a>
+  </div>
+</section>
+
+<footer>
+  <div class="lp-shell">
+    <div class="lp-fl">The Combine</div>
+    <p>Not affiliated with, endorsed by, or connected to any professional football league, team, or broadcaster.</p>
+  </div>
+</footer>
+</div>
+<script src="./app.js?v=12"></script>
 </body>
 </html>
