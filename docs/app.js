@@ -72,6 +72,28 @@ function missedCardHtml(S) {
     ).join("") + "</div>";
 }
 
+/* Viral CTA: invited members can spin up their own league. Tracks the click
+   and carries the source competition through signup for attribution. */
+function ctaCardHtml(small) {
+  return small
+    ? '<button class="btn ghost" data-cta="1">Start your own competition</button>'
+    : '<div class="card"><div class="kicker">Your league next?</div>' +
+      '<button class="btn" data-cta="1">Start your own competition</button>' +
+      '<div class="mut center" style="margin-top:8px">Free &middot; set up in two minutes</div></div>';
+}
+function wireCta(shareToken) {
+  document.querySelectorAll("[data-cta]").forEach((b) => {
+    b.onclick = () => {
+      try { localStorage.setItem("ref_share", shareToken); } catch {}
+      fetch(API + "/track", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "cta_start_own_clicked", share_token: shareToken }),
+      }).catch(() => {});
+      location.hash = "#/admin/signup";
+    };
+  });
+}
+
 /* ================= reveal (shared) ================= */
 function renderReveal(el, standings, opts) {
   const showScore = !!opts.showScore;
@@ -112,7 +134,7 @@ function renderReveal(el, standings, opts) {
 /* ================= member flow ================= */
 function memberView(TOKEN) {
   let S = null, deadlinePerf = null, expiredNotified = false, selected = null, busy = false;
-  let Q = null, total = 0, localIdx = 0, queue = Promise.resolve();
+  let Q = null, total = 0, localIdx = 0, queue = Promise.resolve(), lastPhase = null;
   const ptKey = "pt_" + TOKEN;
 
   const api = async (path, body) => {
@@ -132,6 +154,17 @@ function memberView(TOKEN) {
       // Never jump backwards: pending background submits mean the server's
       // index can lag the locally answered one.
       localIdx = Math.max(localIdx, S.current_index ?? 0);
+    }
+    // Poll updates on the done screen patch the leaderboard in place — a full
+    // re-render would reset the reader's scroll position every 5 seconds.
+    if (S.phase === "done" && lastPhase === "done" && $("#lbWrap")) {
+      const lb = S.leaderboard || [];
+      $("#lbWrap").innerHTML = lb.length
+        ? lbRowsHtml(lb, true)
+        : '<div class="mut" style="margin-top:10px">No other scores yet.</div>';
+      const lc = $("#lbCount");
+      if (lc) lc.textContent = S.finished + " of " + S.league.member_count + " finished";
+      return;
     }
     render();
   }
@@ -201,7 +234,10 @@ function memberView(TOKEN) {
 
   function render() {
     clearTimers();
-    window.scrollTo(0, 0);
+    // Scroll to top only on phase transitions — periodic re-renders (leaderboard
+    // polling) must not yank the reader back up.
+    if (lastPhase !== S.phase) window.scrollTo(0, 0);
+    lastPhase = S.phase;
     const L = S.league;
     const isW = S.type === "wonderlic";
 
@@ -307,10 +343,14 @@ function memberView(TOKEN) {
         '<div class="bignum">' + S.result.score + '<span style="color:var(--dim);font-size:40px">/' + S.result.total + "</span></div>" +
         '<div class="sub">in ' + fmtDur(S.result.duration_ms) + "</div></div>" +
         missedCardHtml(S) +
+        ctaCardHtml() +
         '<div class="card" style="text-align:left"><div class="row spread"><h2>Leaderboard</h2>' +
-        '<span class="mut">' + S.finished + " of " + L.member_count + " finished</span></div>" +
+        '<span class="mut" id="lbCount">' + S.finished + " of " + L.member_count + ' finished</span></div>' +
+        '<div id="lbWrap">' +
         (lb.length ? lbRowsHtml(lb, true) : '<div class="mut" style="margin-top:10px">No other scores yet.</div>') +
+        "</div>" +
         '<div class="mut" style="margin-top:12px">The full draft order reveal unlocks when everyone is done.</div></div></div>';
+      wireCta(TOKEN);
       schedulePoll(5000);
       return;
     }
@@ -320,8 +360,9 @@ function memberView(TOKEN) {
         '<div class="fade-in" style="text-align:left"><div class="kicker">' + esc(L.name) + " &middot; " + L.season_year + '</div>' +
         "<h1>The results are in</h1>" +
         (S.result ? '<div class="sub">You scored ' + S.result.score + "/" + S.result.total + " in " + fmtDur(S.result.duration_ms) + ".</div>" : "") +
-        '<div id="reveal"></div>' + missedCardHtml(S) + "</div>";
+        '<div id="reveal"></div>' + missedCardHtml(S) + ctaCardHtml(true) + "</div>";
       renderReveal($("#reveal"), S.standings, { showScore: S.type === "wonderlic", shareUrl: S.results_url });
+      wireCta(TOKEN);
       return;
     }
 
@@ -399,12 +440,15 @@ function renderLogin(error, mode) {
     </div>`;
   $("#swap").onclick = (e) => { e.preventDefault(); renderLogin("", isLogin ? "signup" : "login"); };
   $("#authBtn").onclick = async () => {
+    const body = { email: $("#em").value, password: $("#pw").value };
+    if (!isLogin) body.ref = localStorage.getItem("ref_share") || undefined;
     const r = await fetch(API + "/admin/" + (isLogin ? "login" : "signup"), {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: $("#em").value, password: $("#pw").value }),
+      body: JSON.stringify(body),
     }).then((x) => x.json());
     if (r.error) { $("#authErr").textContent = r.error; return; }
     localStorage.setItem("adm", r.token);
+    localStorage.removeItem("ref_share");
     location.hash = "#/admin";
     adminHome();
   };
@@ -423,7 +467,8 @@ async function adminHome() {
     <div style="text-align:left">
     <div class="row spread" style="margin-top:10px">
       <div><div class="kicker">Commissioner HQ</div><h1>Your Leagues</h1></div>
-      <button class="btn ghost small" id="logoutBtn">Log out</button>
+      <div class="row">${d.is_owner ? '<a class="btn ghost small" href="#/admin/metrics">Business metrics</a>' : ""}
+      <button class="btn ghost small" id="logoutBtn">Log out</button></div>
     </div>
     <div class="mut">${esc(d.email)}</div>
     ${d.leagues.map((l) => {
@@ -615,6 +660,49 @@ async function compView(id) {
   addTimer(setInterval(poll, 3000));
 }
 
+/* ================= owner metrics ================= */
+async function metricsView() {
+  clearTimers();
+  let d;
+  try { d = await aapi("/api/admin/metrics"); } catch { return; }
+  if (d.error) return adminHome();
+  wrap().classList.add("wide");
+  const t = d.totals;
+  const stat = (v, k) => `<div class="stat"><div class="v">${v}</div><div class="k">${k}</div></div>`;
+  const completionRate = t.members_joined ? Math.round((t.tests_finished / t.members_joined) * 100) + "%" : "—";
+  app().innerHTML = `
+    <div style="text-align:left">
+    <div style="margin-top:10px"><a href="#/admin" class="mut">← Dashboard</a></div>
+    <div class="kicker" style="margin-top:10px">Owner only</div>
+    <h1>Business Metrics</h1>
+    <div class="stats">
+      ${stat(t.accounts, "Accounts")}
+      ${stat(t.leagues, "Leagues")}
+      ${stat(t.competitions, "Competitions created")}
+      ${stat(t.pending, "Pending (live)")}
+      ${stat(t.completed, "Completed")}
+      ${stat(t.drafts, "Not launched")}
+      ${stat(t.members_joined, "Members joined")}
+      ${stat(t.tests_finished, "Tests finished")}
+      ${stat(completionRate, "Join → finish rate")}
+      ${stat(t.avg_score, "Avg test score")}
+      ${stat(t.signups_7d, "Signups, 7 days")}
+      ${stat(t.tests_finished_7d, "Tests finished, 7 days")}
+      ${stat(t.cta_clicks, "Viral CTA clicks")}
+      ${stat(t.signups_via_cta, "Signups via CTA")}
+    </div>
+    <div class="card">
+      <h2>Accounts</h2>
+      <table><thead><tr><th>Email</th><th>Joined</th><th>Leagues</th><th>Comps</th><th>Members</th><th>Finished</th></tr></thead>
+      <tbody>${d.accounts.map((a) =>
+        "<tr><td>" + esc(a.email) + "</td>" +
+        "<td>" + new Date(a.created_at).toLocaleDateString() + "</td>" +
+        "<td>" + a.leagues + "</td><td>" + a.competitions + "</td>" +
+        "<td>" + a.members_joined + "</td><td>" + a.finished + "</td></tr>"
+      ).join("")}</tbody></table>
+    </div></div>`;
+}
+
 /* ================= router ================= */
 function route() {
   clearTimers();
@@ -622,6 +710,8 @@ function route() {
   let m;
   if ((m = h.match(/^#\/c\/([\w-]+)/))) return memberView(m[1]);
   if ((m = h.match(/^#\/r\/([\w-]+)/))) return resultsView(m[1]);
+  if (h.match(/^#\/admin\/signup/)) return localStorage.getItem("adm") ? adminHome() : renderLogin("", "signup");
+  if (h.match(/^#\/admin\/metrics/)) return metricsView();
   if ((m = h.match(/^#\/admin\/league\/([\w-]+)/))) return leagueView(m[1]);
   if ((m = h.match(/^#\/admin\/comp\/([\w-]+)/))) return compView(m[1]);
   return adminHome();

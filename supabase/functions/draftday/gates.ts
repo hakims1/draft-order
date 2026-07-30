@@ -15,14 +15,24 @@ import sql from "./db.ts";
 //   where key = 'monetization';
 // ---------------------------------------------------------------------------
 
-let cache: { value: any; at: number } | null = null;
+const cache = new Map<string, { value: any; at: number }>();
+
+export async function configValue(key: string) {
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < 30_000) return hit.value;
+  const rows = await sql`select value from app_config where key = ${key}`;
+  const value = rows[0]?.value ?? {};
+  cache.set(key, { value, at: Date.now() });
+  return value;
+}
 
 export async function monetizationConfig() {
-  if (cache && Date.now() - cache.at < 30_000) return cache.value;
-  const rows = await sql`select value from app_config where key = 'monetization'`;
-  const value = rows[0]?.value ?? {};
-  cache = { value, at: Date.now() };
-  return value;
+  return await configValue("monetization");
+}
+
+export async function isOwner(email: string): Promise<boolean> {
+  const app = await configValue("app");
+  return (app.owner_emails ?? []).includes(email);
 }
 
 // Fire-and-forget funnel event. Never throws into the request path.

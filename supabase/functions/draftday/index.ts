@@ -18,7 +18,7 @@ import {
   startAttempt,
   submitAnswer,
 } from "./logic.ts";
-import { checkGate, logEvent } from "./gates.ts";
+import { checkGate, isOwner, logEvent } from "./gates.ts";
 
 const FN = "draftday";
 // Public site (GitHub Pages). Share/results URLs are built against this.
@@ -255,6 +255,22 @@ app.get("/r/:rtoken/data.json", async (c) => {
   });
 });
 
+// Public click-tracking for whitelisted funnel events (e.g. the viral CTA on
+// the completion screen). share_token attributes the click to a competition.
+const TRACKABLE = new Set(["cta_start_own_clicked"]);
+app.post("/track", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const name = String(b.name ?? "");
+  if (!TRACKABLE.has(name)) return c.json({ ok: false });
+  let competitionId: string | undefined;
+  if (b.share_token) {
+    const comp = await competitionByShareToken(String(b.share_token));
+    competitionId = comp?.id;
+  }
+  await logEvent(name, { competitionId });
+  return c.json({ ok: true });
+});
+
 // ---------------- admin auth ----------------
 
 async function requireAdmin(c: any) {
@@ -264,7 +280,7 @@ async function requireAdmin(c: any) {
 }
 
 app.post("/admin/signup", async (c) => {
-  const { email: rawEmail, password } = await c.req.json().catch(() => ({}));
+  const { email: rawEmail, password, ref } = await c.req.json().catch(() => ({}));
   const email = String(rawEmail ?? "").trim().toLowerCase();
   if (!email.includes("@") || String(password ?? "").length < 8) {
     return c.json({ error: "Enter a valid email and a password of 8+ characters." });
@@ -274,6 +290,13 @@ app.post("/admin/signup", async (c) => {
   const [admin] = await sql`
     insert into admins (email, password_hash) values (${email}, ${await hashPassword(String(password))})
     returning id`;
+  // Attribute the signup to the competition whose CTA sent them here, if any.
+  let refCompId: string | undefined;
+  if (typeof ref === "string" && ref) {
+    const refComp = await competitionByShareToken(ref);
+    refCompId = refComp?.id;
+  }
+  await logEvent("signup", { adminId: admin.id, competitionId: refCompId, props: { via_cta: !!refCompId } });
   return c.json({ token: await createSession(admin.id) });
 });
 
@@ -304,7 +327,52 @@ app.get("/api/admin/dashboard", async (c) => {
     l.competitions = await sql`
       select id, type, status from competitions where league_id = ${l.id} order by created_at desc`;
   }
-  return c.json({ email: admin.email, leagues });
+  return c.json({ email: admin.email, leagues, is_owner: await isOwner(admin.email) });
+});
+
+// Owner-only business metrics: overview counts plus per-account detail.
+app.get("/api/admin/metrics", async (c) => {
+  const admin = await requireAdmin(c);
+  if (!admin) return c.json({ error: "unauthorized" }, 401);
+  if (!(await isOwner(admin.email))) return c.json({ error: "forbidden" }, 403);
+
+  const [totals] = await sql`
+    with comp_state as (
+      select c.id, c.status, c.type, l.member_count,
+        (select count(*) from attempts a join participants p on p.id = a.participant_id
+          where p.competition_id = c.id and a.status = 'finished') as fin
+      from competitions c join leagues l on l.id = c.league_id
+    )
+    select
+      (select count(*)::int from admins) as accounts,
+      (select count(*)::int from leagues) as leagues,
+      (select count(*)::int from comp_state) as competitions,
+      (select count(*)::int from comp_state where status = 'draft') as drafts,
+      (select count(*)::int from comp_state where status = 'closed' or (status = 'active' and fin >= member_count)) as completed,
+      (select count(*)::int from comp_state where status = 'active' and fin < member_count) as pending,
+      (select count(*)::int from participants where not is_placeholder) as members_joined,
+      (select count(*)::int from attempts where status = 'finished' and duration_ms > 0) as tests_finished,
+      (select coalesce(round(avg(score), 1), 0)::float from attempts where status = 'finished' and duration_ms > 0) as avg_score,
+      (select count(*)::int from events where name = 'cta_start_own_clicked') as cta_clicks,
+      (select count(*)::int from events where name = 'signup' and (props->>'via_cta')::boolean) as signups_via_cta,
+      (select count(*)::int from events where name = 'signup' and created_at > now() - interval '7 days') as signups_7d,
+      (select count(*)::int from events where name = 'attempt_finished' and created_at > now() - interval '7 days') as tests_finished_7d`;
+
+  const accounts = await sql`
+    select a.email, a.created_at,
+      count(distinct l.id)::int as leagues,
+      count(distinct c.id)::int as competitions,
+      count(distinct p.id) filter (where not p.is_placeholder)::int as members_joined,
+      count(distinct at.id) filter (where at.status = 'finished')::int as finished
+    from admins a
+    left join leagues l on l.admin_id = a.id
+    left join competitions c on c.league_id = l.id
+    left join participants p on p.competition_id = c.id
+    left join attempts at on at.participant_id = p.id
+    group by a.id, a.email, a.created_at
+    order by a.created_at desc`;
+
+  return c.json({ totals, accounts });
 });
 
 app.post("/api/admin/leagues", async (c) => {
