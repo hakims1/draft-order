@@ -181,15 +181,23 @@ export async function startAttempt(comp: any, participant: any) {
   const existing = await currentAttempt(participant.id);
   if (existing) return existing; // one attempt: resume or show result, never restart
   const cfg = comp.config ?? {};
-  const bankVersion = cfg.bank_version ?? 1;
-  const limitSec = cfg.time_limit_seconds ?? 360;
-  const questions = await bankQuestions(bankVersion);
-  const order = seededShuffle(questions.map((q: any) => q.id), `q:${participant.shuffle_seed}`);
-  const optionOrders: Record<string, number[]> = {};
-  for (const q of questions) {
-    optionOrders[q.id] = seededShuffle([0, 1, 2, 3], `o:${participant.shuffle_seed}:${q.id}`);
+  let state: any;
+  let limitSec: number;
+  if (comp.type === "trex") {
+    // One session: practice runs + the real run, against a session clock.
+    state = { runs: [] };
+    limitSec = cfg.session_limit_seconds ?? 900;
+  } else {
+    const bankVersion = cfg.bank_version ?? 1;
+    limitSec = cfg.time_limit_seconds ?? 360;
+    const questions = await bankQuestions(bankVersion);
+    const order = seededShuffle(questions.map((q: any) => q.id), `q:${participant.shuffle_seed}`);
+    const optionOrders: Record<string, number[]> = {};
+    for (const q of questions) {
+      optionOrders[q.id] = seededShuffle([0, 1, 2, 3], `o:${participant.shuffle_seed}:${q.id}`);
+    }
+    state = { question_order: order, option_orders: optionOrders, answers: {}, current_index: 0 };
   }
-  const state = { question_order: order, option_orders: optionOrders, answers: {}, current_index: 0 };
   const rows = await sql`
     insert into attempts (participant_id, started_at, deadline_at, state)
     values (${participant.id}, now(), now() + make_interval(secs => ${limitSec}), ${sql.json(state)})
@@ -201,7 +209,17 @@ export async function startAttempt(comp: any, participant: any) {
   return rows[0] ?? await currentAttempt(participant.id);
 }
 
+// The run that counts is the one after the practice runs.
+export function realRunIndex(comp: any): number {
+  return comp.config?.practice_runs ?? 3;
+}
+
 async function scoreAttempt(attempt: any, comp: any): Promise<number> {
+  if (comp.type === "trex") {
+    const runs = attemptState(attempt).runs ?? [];
+    const real = runs[realRunIndex(comp)];
+    return real ? Number(real.score) || 0 : 0;
+  }
   const questions = await bankQuestions(comp.config?.bank_version ?? 1);
   const answers = attemptState(attempt).answers ?? {};
   let score = 0;
@@ -272,6 +290,32 @@ export async function submitAnswer(
   return { done: false, attempt: updated };
 }
 
+// Record one T-Rex run (practice or real). Scores are clamped to what's
+// physically possible in the elapsed session time (~13 points/sec in-game).
+export async function submitRun(comp: any, attempt: any, rawScore: number) {
+  const ms = await remainingMs(attempt);
+  if (ms <= 0) {
+    const finalized = await finalizeAttempt(attempt, comp, true);
+    return { done: true, attempt: finalized, timedOut: true };
+  }
+  const st = attemptState(attempt);
+  st.runs = st.runs ?? [];
+  const totalRuns = realRunIndex(comp) + 1;
+  if (st.runs.length >= totalRuns) return { done: true, attempt };
+  const limitMs = (comp.config?.session_limit_seconds ?? 900) * 1000;
+  const elapsedSec = Math.max(1, (limitMs - ms) / 1000);
+  const cap = Math.floor(elapsedSec * 20 + 100);
+  const score = Math.max(0, Math.min(Math.floor(Number(rawScore) || 0), cap));
+  st.runs.push({ score });
+  const [updated] = await sql`
+    update attempts set state = ${sql.json(st)} where id = ${attempt.id} returning *`;
+  if (st.runs.length >= totalRuns) {
+    const finalized = await finalizeAttempt(updated, comp, false);
+    return { done: true, attempt: finalized };
+  }
+  return { done: false, attempt: updated };
+}
+
 // ---------- admin close ----------
 
 export async function closeCompetition(competitionId: string) {
@@ -279,18 +323,25 @@ export async function closeCompetition(competitionId: string) {
     const [comp] = await tx`select * from competitions where id = ${competitionId} for update`;
     if (!comp || comp.status === "closed") return;
 
-    if (comp.type === "wonderlic") {
-      // Finalize anyone mid-test with their current answers.
+    if (comp.type === "wonderlic" || comp.type === "trex") {
+      // Finalize anyone mid-attempt with what they have so far.
       const inProgress = await tx`
         select a.*, p.competition_id from attempts a
         join participants p on p.id = a.participant_id
         where p.competition_id = ${competitionId} and a.status = 'in_progress'`;
-      const questions = await tx`
-        select id, correct_index from questions
-        where bank_version = ${comp.config?.bank_version ?? 1}`;
+      const questions = comp.type === "wonderlic"
+        ? await tx`
+            select id, correct_index from questions
+            where bank_version = ${comp.config?.bank_version ?? 1}`
+        : [];
       for (const a of inProgress) {
         let score = 0;
-        for (const q of questions) if (attemptState(a).answers?.[q.id] === q.correct_index) score++;
+        if (comp.type === "trex") {
+          const real = (attemptState(a).runs ?? [])[realRunIndex(comp)];
+          score = real ? Number(real.score) || 0 : 0;
+        } else {
+          for (const q of questions) if (attemptState(a).answers?.[q.id] === q.correct_index) score++;
+        }
         await tx`
           update attempts set status = 'finished',
             finished_at = least(now(), deadline_at),

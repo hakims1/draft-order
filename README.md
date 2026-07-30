@@ -12,6 +12,12 @@ Two competition types ship in v1:
   Wonderlic-style format). Score descending, ties broken by elapsed time ascending.
 - **`random_order`** — everyone enters a name; when the last slot fills, the order is
   drawn server-side exactly once and revealed with an animation.
+- **`trex`** — the Chromium T-Rex runner as a game of skill: 3 practice runs, then one
+  run that counts, all in a single 15-minute session. The real run's score ranks the
+  leaderboard exactly like a test score. Game code vendored from
+  [wayou/t-rex-runner](https://github.com/wayou/t-rex-runner) (BSD-3-Clause, Chromium
+  sources — license and copyright headers retained in `docs/trex/`). Scores are
+  server-clamped to plausible accrual rates; runs are recorded server-side per session.
 
 ## Architecture
 

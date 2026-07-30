@@ -15,8 +15,10 @@ import {
   remainingMs,
   standings,
   standingsVisible,
+  realRunIndex,
   startAttempt,
   submitAnswer,
+  submitRun,
 } from "./logic.ts";
 import { checkGate, isOwner, logEvent } from "./gates.ts";
 
@@ -101,7 +103,7 @@ async function memberState(c: any, comp: any, light = false) {
   const payload: any = { type: comp.type, league, finished: displayCount };
 
   const attempt = participant ? await currentAttempt(participant.id) : null;
-  const total = comp.config?.question_count ?? 30;
+  const total = comp.type === "wonderlic" ? (comp.config?.question_count ?? 30) : null;
   if (attempt?.status === "finished") {
     payload.result = { score: Number(attempt.score), total, duration_ms: attempt.duration_ms };
     if (comp.type === "wonderlic" && !light) {
@@ -173,6 +175,14 @@ async function memberState(c: any, comp: any, light = false) {
     return await memberState(c, comp, light);
   }
   const st = attemptState(attempt);
+  if (comp.type === "trex") {
+    payload.phase = "game";
+    payload.remaining_ms = ms;
+    payload.run_index = (st.runs ?? []).length;
+    payload.practice_runs = realRunIndex(comp);
+    payload.runs = (st.runs ?? []).map((r: any) => r.score);
+    return payload;
+  }
   payload.phase = "question";
   payload.remaining_ms = ms;
   payload.current_index = st.current_index;
@@ -216,8 +226,21 @@ app.post("/c/:token/start", async (c) => {
   if (!comp) return c.json({ phase: "error", error: "Competition not found." }, 404);
   const participant = await participantBySession(comp.id, c.req.header("x-pt"));
   if (!participant) return c.json({ phase: "error", error: "Join first." });
-  if (comp.type === "wonderlic" && comp.status === "active") {
+  if ((comp.type === "wonderlic" || comp.type === "trex") && comp.status === "active") {
     await startAttempt(comp, participant);
+  }
+  return c.json(await memberState(c, comp));
+});
+
+// T-Rex: record one run (practice or real). The 4th run finalizes the attempt.
+app.post("/c/:token/run", async (c) => {
+  const comp = await competitionByShareToken(c.req.param("token"));
+  if (!comp) return c.json({ phase: "error", error: "Competition not found." }, 404);
+  const participant = await participantBySession(comp.id, c.req.header("x-pt"));
+  const attempt = participant ? await currentAttempt(participant.id) : null;
+  if (comp.type === "trex" && attempt && attempt.status === "in_progress") {
+    const body = await c.req.json().catch(() => ({}));
+    await submitRun(comp, attempt, Number(body.score));
   }
   return c.json(await memberState(c, comp));
 });
@@ -435,9 +458,11 @@ app.post("/api/admin/league/:id/competitions", async (c) => {
     return c.json({ error: "This league already has a competition. One competition per league for now." });
   }
   const b = await c.req.json().catch(() => ({}));
-  const type = String(b.type) === "random_order" ? "random_order" : "wonderlic";
+  const type = ["random_order", "trex"].includes(String(b.type)) ? String(b.type) : "wonderlic";
   const config = type === "wonderlic"
     ? { bank_version: 1, question_count: 30, time_limit_seconds: 360, max_attempts: 1 }
+    : type === "trex"
+    ? { practice_runs: 3, session_limit_seconds: 900, max_attempts: 1 }
     : { max_attempts: 1 };
   const [comp] = await sql`
     insert into competitions (league_id, type, config)

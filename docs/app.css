@@ -176,3 +176,10 @@ a { color: var(--accent); }
 .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
 .stat .v { font-family: "Barlow Condensed", sans-serif; font-size: 34px; font-weight: 800; color: var(--accent); line-height: 1; font-variant-numeric: tabular-nums; }
 .stat .k { color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-top: 6px; }
+
+/* ---- t-rex runner stage ---- */
+.trex-stage { position: relative; background: #f7f7f7; border-radius: 14px; margin-top: 16px; padding: 24px 8px; overflow: hidden; min-height: 170px; }
+.trex-stage .runner-container { position: relative; margin: 0 auto; overflow: hidden; }
+.trex-stage .runner-canvas { display: block; margin: 0 auto; max-width: 100%; image-rendering: pixelated; }
+.trex-stage .controller { position: absolute; inset: 0; z-index: 3; }
+.clock.sm { font-size: 22px; text-shadow: none; letter-spacing: 1px; }
