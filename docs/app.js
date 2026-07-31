@@ -146,6 +146,12 @@ function loadTrexAssets() {
       document.body.appendChild(s);
     });
   }).then(function () {
+    // Neutralize Chrome's fullscreen "arcade mode": on game start the stock
+    // code applies scale()+translateY() (multiplied by devicePixelRatio) to
+    // take over the whole page — inside our card that throws the canvas out
+    // of view, worst on retina phones. The game plays fine without it.
+    Runner.prototype.setArcadeMode = function () {};
+    Runner.prototype.setArcadeModeContainerScale = function () {};
     // Emit a crash event carrying the displayed score.
     var orig = Runner.prototype.gameOver;
     Runner.prototype.gameOver = function () {
@@ -348,9 +354,9 @@ function memberView(TOKEN) {
     if (lastPhase !== "game") window.scrollTo(0, 0);
     lastPhase = "game";
     app().innerHTML =
-      '<div style="text-align:left"><div class="kicker">' + esc(S.league.name) + '</div>' +
+      '<div class="game-screen" style="text-align:left"><div><div class="kicker">' + esc(S.league.name) + '</div>' +
       '<h1 style="font-size:30px">T-Rex Run-Off</h1>' +
-      '<div id="gameHead">' + gameHeader() + "</div>" +
+      '<div id="gameHead">' + gameHeader() + "</div></div>" +
       '<div class="trex-stage"><div id="trexCont"></div></div>' +
       '<div class="card"><div class="sub" id="runMsg">Loading the game&hellip;</div>' +
       '<button class="btn" id="runBtn" style="display:none"></button></div></div>';

@@ -192,3 +192,7 @@ a { color: var(--accent); }
 .trex-stage .runner-canvas { display: block; margin: 0 auto; max-width: 100%; image-rendering: pixelated; }
 .trex-stage .controller { position: absolute; inset: 0; z-index: 3; }
 .clock.sm { font-size: 22px; text-shadow: none; letter-spacing: 1px; }
+
+/* Game screen: center the play area vertically — phones are the primary device. */
+.game-screen { display: flex; flex-direction: column; justify-content: center; min-height: calc(100svh - 110px); }
+.game-screen .trex-stage { margin-top: 20px; }
