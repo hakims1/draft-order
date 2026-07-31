@@ -215,7 +215,14 @@ function memberView(TOKEN) {
     return await r.json();
   };
 
+  // True while this member view is still the active route. Async callbacks
+  // (poll responses, answer acks) must bail once the user navigates away —
+  // e.g. tapping "Start your own competition" — or a late response would
+  // repaint the member screen over the new page and re-arm polling.
+  const viewActive = () => location.hash.indexOf("#/c/" + TOKEN) === 0;
+
   function setState(next) {
+    if (!viewActive()) return;
     S = next;
     if (S.remaining_ms != null) { deadlinePerf = performance.now() + S.remaining_ms; expiredNotified = false; }
     if (S.phase === "question") {
@@ -237,7 +244,10 @@ function memberView(TOKEN) {
     }
     render();
   }
-  async function refresh() { try { setState(await api("/state.json")); } catch {} }
+  async function refresh() {
+    if (!viewActive()) return;
+    try { setState(await api("/state.json")); } catch {}
+  }
   function schedulePoll(ms) { const t = setInterval(refresh, ms); addTimer(t); }
 
   function tickClock() {
@@ -252,7 +262,7 @@ function memberView(TOKEN) {
   // Answer acks ride a background queue: the UI advances instantly and only
   // the clock re-sync (or a server-side finalization) comes back to us.
   function handleAck(r) {
-    if (!r) return;
+    if (!r || !viewActive()) return;
     if (r.phase && r.phase !== "question") { setState(r); return; }
     if (r.remaining_ms != null) { deadlinePerf = performance.now() + r.remaining_ms; expiredNotified = false; }
   }
@@ -326,7 +336,7 @@ function memberView(TOKEN) {
   }
 
   function handleRunAck(r, score) {
-    if (!r) return;
+    if (!r || !viewActive()) return;
     if (r.phase !== "game") { setState(r); return; }
     S = r;
     if (r.remaining_ms != null) { deadlinePerf = performance.now() + r.remaining_ms; expiredNotified = false; }
@@ -337,14 +347,17 @@ function memberView(TOKEN) {
     if (!msg || !btn) return;
     msg.innerHTML = "Run over &mdash; you scored <b>" + score + "</b>." +
       (isRealNext ? ' <b style="color:var(--danger)">Next one counts.</b>' : " " + (r.practice_runs - r.run_index) + " practice run" + (r.practice_runs - r.run_index === 1 ? "" : "s") + " left.");
+    const pad = $("#tapPad");
+    if (pad) { pad.classList.add("idle"); pad.innerHTML = "Use the button above to start the next run"; }
     btn.style.display = "block";
     btn.className = "btn" + (isRealNext ? " danger" : "");
     btn.textContent = isRealNext ? "Start the real run" : "Start practice " + (r.run_index + 1);
     btn.onclick = function () {
       btn.style.display = "none";
       msg.innerHTML = isRealNext
-        ? '<b style="color:var(--danger)">This run counts.</b> Tap the game (or press Space) to jump.'
-        : "Tap the game (or press Space) to jump. Run ends when you crash.";
+        ? '<b style="color:var(--danger)">This run counts.</b> Tap anywhere below (or press Space) to jump.'
+        : "Tap anywhere below (or press Space) to jump. Run ends when you crash.";
+      if (pad) { pad.classList.remove("idle"); pad.innerHTML = '<span class="tp-arrow">&#9650;</span> Tap to jump'; }
       if (dino) dino.restart();
     };
   }
@@ -359,7 +372,24 @@ function memberView(TOKEN) {
       '<div id="gameHead">' + gameHeader() + "</div></div>" +
       '<div class="trex-stage"><div id="trexCont"></div></div>' +
       '<div class="card"><div class="sub" id="runMsg">Loading the game&hellip;</div>' +
-      '<button class="btn" id="runBtn" style="display:none"></button></div></div>';
+      '<button class="btn" id="runBtn" style="display:none"></button></div>' +
+      '<div class="tap-pad" id="tapPad"><span class="tp-arrow">&#9650;</span> Tap to jump</div></div>';
+    // Big tap target: the pad and the game card both feed the game's own
+    // keyboard handler. Inert while a run is over so mashing can't skip the
+    // between-runs screen (the button above is the only way to start the next run).
+    const sendJumpKey = (type) => {
+      const ev = new KeyboardEvent(type, { bubbles: true, cancelable: true });
+      Object.defineProperty(ev, "keyCode", { get: () => 32 });
+      document.dispatchEvent(ev);
+    };
+    [$("#tapPad"), document.querySelector(".trex-stage")].forEach((el) => {
+      el.addEventListener("pointerdown", (e) => {
+        if (!window.Runner || !Runner.instance_ || Runner.instance_.crashed) return;
+        e.preventDefault();
+        sendJumpKey("keydown");
+      });
+      el.addEventListener("pointerup", () => sendJumpKey("keyup"));
+    });
     tickClock();
     addTimer(setInterval(tickClock, 1000));
     loadTrexAssets().then(function () {
@@ -369,8 +399,8 @@ function memberView(TOKEN) {
       armCrash();
       const isReal = S.run_index >= S.practice_runs;
       $("#runMsg").innerHTML = isReal
-        ? '<b style="color:var(--danger)">This run counts.</b> Tap the game (or press Space) to jump and start.'
-        : "Tap the game (or press Space) to jump and start practice run " + (S.run_index + 1) + ". Run ends when you crash.";
+        ? '<b style="color:var(--danger)">This run counts.</b> Tap anywhere below (or press Space) to jump and start.'
+        : "Tap anywhere below (or press Space) to jump and start practice run " + (S.run_index + 1) + ". Run ends when you crash.";
     }).catch(function () {
       const m = $("#runMsg");
       if (m) m.textContent = "Couldn't load the game — check your connection and refresh.";
@@ -534,9 +564,11 @@ function memberView(TOKEN) {
 
 /* ================= results page ================= */
 async function resultsView(TOKEN) {
+  const viewActive = () => location.hash.indexOf("#/r/" + TOKEN) === 0;
   let r;
   try { r = await fetch(API + "/r/" + TOKEN + "/data.json").then((x) => x.json()); }
-  catch { addTimer(setInterval(() => resultsView(TOKEN), 8000)); return; }
+  catch { if (viewActive()) addTimer(setInterval(() => resultsView(TOKEN), 8000)); return; }
+  if (!viewActive()) return;
   if (r.error) {
     clearTimers();
     app().innerHTML = '<div class="card center"><h2>Link not found</h2></div>';

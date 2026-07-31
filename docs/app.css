@@ -196,3 +196,17 @@ a { color: var(--accent); }
 /* Game screen: center the play area vertically — phones are the primary device. */
 .game-screen { display: flex; flex-direction: column; justify-content: center; min-height: calc(100svh - 110px); }
 .game-screen .trex-stage { margin-top: 20px; }
+
+/* ---- t-rex tap pad: thumb-sized jump target filling the leftover screen ---- */
+.tap-pad {
+  flex: 1; min-height: 150px; margin-top: 14px;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  border: 2px dashed var(--line); border-radius: 16px;
+  color: var(--dim); font-family: "Oswald", sans-serif; font-weight: 600;
+  font-size: 18px; text-transform: uppercase; letter-spacing: 2px;
+  touch-action: none; user-select: none; -webkit-user-select: none; cursor: pointer;
+}
+.tap-pad .tp-arrow { color: var(--accent); font-size: 14px; }
+.tap-pad:active { background: var(--panel); border-color: var(--accent); color: var(--accent); }
+.tap-pad.idle { opacity: .55; cursor: default; font-size: 14px; letter-spacing: 1px; }
+.trex-stage { touch-action: none; }
