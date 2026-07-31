@@ -67,16 +67,25 @@ export async function attemptsByEvent(participantId: string): Promise<Record<str
   return map;
 }
 
+
+// competitions.config should be an object; tolerate legacy double-encoded rows.
+function fixConfig(comp: any) {
+  if (comp && typeof comp.config === "string") {
+    try { comp.config = JSON.parse(comp.config); } catch { comp.config = {}; }
+  }
+  return comp;
+}
+
 // ---------- lookups ----------
 
 export async function competitionByShareToken(token: string) {
   const rows = await sql`select * from competitions where share_token = ${token}`;
-  return rows[0] ?? null;
+  return rows[0] ? fixConfig(rows[0]) : null;
 }
 
 export async function competitionByResultsToken(token: string) {
   const rows = await sql`select * from competitions where results_token = ${token}`;
-  return rows[0] ?? null;
+  return rows[0] ? fixConfig(rows[0]) : null;
 }
 
 export async function bankQuestions(bankVersion: number) {
@@ -249,6 +258,7 @@ export async function joinCompetition(comp: any, name: string, realName = "") {
 
 async function generateRandomOrder(tx: any, competitionId: string) {
   const [comp] = await tx`select * from competitions where id = ${competitionId} for update`;
+  fixConfig(comp);
   if (comp.config?.order_generated) return;
   const ps = await tx`
     select id from participants
@@ -434,49 +444,50 @@ export async function participantKeyEntitled(participantId: string): Promise<boo
   return rows.length > 0;
 }
 
-// The full key for one buyer: their own sheet question by question, plus what
-// every other FINISHED member missed. Members who haven't finished the test
-// are simply absent — they have no answers yet.
+// The key, grouped per player: every participant appears — finished players
+// with their missed questions (missed only, with explanations), unfinished
+// players as pending. The buyer's own row is flagged.
 export async function buildAnswerKey(comp: any, buyer: any) {
   const bank = await bankQuestions(comp.config?.bank_version ?? 1);
-  const own = await currentAttempt(buyer.id, "wonderlic");
-  const ownAnswers = own ? (attemptState(own).answers ?? {}) : {};
-  const yours = bank.map((q: any) => {
-    const pick = ownAnswers[q.id];
+  const rows = await sql`
+    select p.id, p.display_name, p.real_name, a.status, a.score, a.state
+    from participants p
+    left join attempts a on a.participant_id = p.id and a.event_key = 'wonderlic'
+    where p.competition_id = ${comp.id} and not p.is_placeholder
+    order by (a.status = 'finished') desc nulls last, a.score desc nulls last, p.created_at`;
+  const players = rows.map((m: any) => {
+    const finished = m.status === "finished";
+    let missed: any[] | null = null;
+    if (finished) {
+      const answers = attemptState(m).answers ?? {};
+      missed = bank
+        .filter((q: any) => answers[q.id] !== q.correct_index)
+        .map((q: any) => ({
+          prompt: q.prompt,
+          answer: answers[q.id] === null || answers[q.id] === undefined ? null : q.options[answers[q.id]],
+          correct: q.options[q.correct_index],
+          explanation: q.explanation,
+        }));
+    }
     return {
-      prompt: q.prompt,
-      correct: q.options[q.correct_index],
-      your_answer: pick === null || pick === undefined ? null : q.options[pick],
-      got_it: pick === q.correct_index,
-      explanation: q.explanation,
+      name: m.display_name,
+      real_name: m.real_name,
+      is_you: m.id === buyer.id,
+      finished,
+      score: finished ? Number(m.score) : null,
+      missed,
     };
   });
-  const others = await sql`
-    select p.id, p.display_name, p.real_name, a.score, a.state from attempts a
-    join participants p on p.id = a.participant_id
-    where p.competition_id = ${comp.id} and a.event_key = 'wonderlic'
-      and a.status = 'finished' and p.id != ${buyer.id}
-    order by a.score desc, a.duration_ms asc`;
-  const members = others.map((m: any) => {
-    const answers = attemptState(m).answers ?? {};
-    const missed = bank
-      .filter((q: any) => answers[q.id] !== q.correct_index)
-      .map((q: any) => ({
-        prompt: q.prompt,
-        their_answer: answers[q.id] === null || answers[q.id] === undefined ? null : q.options[answers[q.id]],
-        correct: q.options[q.correct_index],
-      }));
-    return { name: m.display_name, real_name: m.real_name, score: Number(m.score), missed };
-  });
-  return { yours, members };
+  return { players, member_count: comp.member_count };
 }
 
-// ---------- admin close ----------
+// ---------- admin close ----------// ---------- admin close ----------
 
 export async function closeCompetition(competitionId: string) {
   await sql.begin(async (tx) => {
     const [comp] = await tx`select * from competitions where id = ${competitionId} for update`;
     if (!comp || comp.status === "closed") return;
+    fixConfig(comp);
 
     if (comp.type !== "random_order") {
       // Finalize anyone mid-attempt with what they have so far (per event).

@@ -463,16 +463,16 @@ app.post("/api/admin/competitions", async (c) => {
     return c.json({ error: "The Skill and Wit Combine needs Ultimate.", upsell: "ultimate" });
   }
   const config = type === "wonderlic"
-    ? { bank_version: 1, question_count: 30, time_limit_seconds: 360, max_attempts: 1 }
+    ? { bank_version: 2, question_count: 30, time_limit_seconds: 360, max_attempts: 1 }
     : type === "trex"
     ? { practice_runs: 3, session_limit_seconds: 900, max_attempts: 1 }
     : type === "combine"
-    ? { events: ["wonderlic", "trex"], bank_version: 1, question_count: 30,
+    ? { events: ["wonderlic", "trex"], bank_version: 2, question_count: 30,
         time_limit_seconds: 360, practice_runs: 3, session_limit_seconds: 900, max_attempts: 1 }
     : { max_attempts: 1 };
   const [comp] = await sql`
     insert into competitions (admin_id, name, member_count, type, config)
-    values (${admin.id}, ${name}, ${members}, ${type}, ${JSON.stringify(config)}::jsonb)
+    values (${admin.id}, ${name}, ${members}, ${type}, ${sql.json(config)})
     returning id`;
   return c.json({ id: comp.id });
 });
@@ -500,7 +500,9 @@ async function ownedCompetition(adminId: string, compId: string) {
   const rows = await sql`
     select * from competitions
     where id = ${compId} and admin_id = ${adminId}`.catch(() => []);
-  return rows[0] ?? null;
+  if (!rows[0]) return null;
+  if (typeof rows[0].config === "string") { try { rows[0].config = JSON.parse(rows[0].config); } catch {} }
+  return rows[0];
 }
 
 app.get("/api/admin/competition/:id", async (c) => {
@@ -684,7 +686,7 @@ app.get("/api/admin/competition/:id/answer_key", async (c) => {
     return c.json({ error: "Available once the competition is complete.", pending: true });
   }
   const key = await buildAnswerKey(comp, { id: "00000000-0000-0000-0000-000000000000" });
-  return c.json({ members: key.members });
+  return c.json(key);
 });
 
 // ---------------- serve (normalize hosted path prefixes) ----------------

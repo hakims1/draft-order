@@ -101,6 +101,39 @@ function showPaywall(p, opts) {
   return close;
 }
 
+
+/* ---- game type cards: illustrated, single-select ---- */
+const GT_ICONS = {
+  wonderlic:
+    '<svg class="gt-ic" viewBox="0 0 72 48" fill="none">' +
+    '<rect x="10" y="4" width="34" height="40" rx="3" fill="#EDEFF5"/>' +
+    '<path d="M15 12h18M15 20h24M15 28h20" stroke="#8B94A9" stroke-width="2" stroke-linecap="round"/>' +
+    '<circle cx="17" cy="36" r="2.6" fill="none" stroke="#3DDC84" stroke-width="1.8"/>' +
+    '<circle cx="25" cy="36" r="2.6" fill="#FFB01F"/>' +
+    '<circle cx="33" cy="36" r="2.6" fill="none" stroke="#8B94A9" stroke-width="1.8"/>' +
+    '<circle cx="56" cy="18" r="11" fill="none" stroke="#FFB01F" stroke-width="3"/>' +
+    '<path d="M56 12v6l4 3" stroke="#FFB01F" stroke-width="2.6" stroke-linecap="round"/>' +
+    '<path d="M48 34l14 8M62 42l-3.4.4M62 42l-.6-3.4" stroke="#4DA3FF" stroke-width="2.4" stroke-linecap="round"/></svg>',
+  trex:
+    '<svg class="gt-ic" viewBox="0 0 72 48" fill="none">' +
+    '<path d="M40 12h12v6h-4v4h-4v6l6 8v4h-6l-6-8h-4v8h-6v-10l4-6v-8h8z" fill="#1E2942"/>' +
+    '<rect x="46" y="15" width="5" height="3.4" fill="#FFB01F"/>' +
+    '<path d="M12 26v14M12 30c-4 0-5-2-5-6M12 34c4 0 5-2 5-6" stroke="#3DDC84" stroke-width="3.4" stroke-linecap="round"/>' +
+    '<path d="M64 32v8M64 35c-2.6 0-3.6-1.4-3.6-4" stroke="#3DDC84" stroke-width="2.8" stroke-linecap="round"/>' +
+    '<path d="M4 44h64" stroke="#8B94A9" stroke-width="2" stroke-dasharray="5 4"/>' +
+    '<circle cx="63" cy="8" r="4" fill="#FFB01F" opacity=".9"/></svg>',
+  combine:
+    '<svg class="gt-ic" viewBox="0 0 72 48" fill="none">' +
+    '<rect x="6" y="8" width="24" height="32" rx="3" fill="#EDEFF5"/>' +
+    '<path d="M10 15h14M10 21h16M10 27h12" stroke="#8B94A9" stroke-width="1.8" stroke-linecap="round"/>' +
+    '<circle cx="12" cy="34" r="2" fill="#FFB01F"/>' +
+    '<path d="M52 14h8v4h-3v3h-3v4l4 6v3h-4l-4-6h-3v6h-4v-7l3-4v-6h6z" fill="#1E2942"/>' +
+    '<path d="M42 32v8M42 35c-2.4 0-3.2-1.2-3.2-3.6" stroke="#3DDC84" stroke-width="2.6" stroke-linecap="round"/>' +
+    '<path d="M33 22h6M39 22l-2.4-2.4M39 22l-2.4 2.4" stroke="#C9A44C" stroke-width="2.4" stroke-linecap="round"/>' +
+    '<path d="M33 30h6M33 30l2.4-2.4M33 30l2.4 2.4" stroke="#C9A44C" stroke-width="2.4" stroke-linecap="round"/>' +
+    '<path d="M36 4l-3 6h2.6l-1.8 5 4.6-6.6h-2.6l1.6-4.4h-1.4z" fill="#A78BFA" stroke="#A78BFA" stroke-width=".5"/></svg>',
+};
+
 /* ---- Ultimate upsell: three features, three custom icons ---- */
 const ULT_ICONS = {
   players:
@@ -149,44 +182,45 @@ function openUltimateModal(price, onPurchase, onSkip) {
 }
 
 function missedCardHtml(S) {
-  // Full key: the buyer's own sheet plus every finished member's misses.
+  // Full key, grouped per player: missed questions only. Unfinished players
+  // show as PENDING with an invite button; unfilled slots get one too.
   if (S.answer_key) {
     const k = S.answer_key;
-    const own =
-      '<div class="card" style="text-align:left"><h2>The Answer Key</h2>' +
-      '<div class="mut" style="margin-top:4px">Your sheet, question by question.</div>' +
-      k.yours.map((q, i) =>
-        '<div class="miss"><div class="miss-q">' + (i + 1) + ". " + esc(q.prompt) + "</div>" +
-        (q.got_it
-          ? '<div class="miss-c">You got it: ' + esc(q.correct) + "</div>"
-          : '<div class="miss-a">Your answer: ' + (q.your_answer != null ? esc(q.your_answer) : "no answer") + "</div>" +
-            '<div class="miss-c">Correct: ' + esc(q.correct) + "</div>") +
-        (q.explanation ? '<div class="miss-x">' + esc(q.explanation) + "</div>" : "") +
-        "</div>").join("") +
-      "</div>";
-    const league =
-      '<div class="card" style="text-align:left"><h2>The league&#39;s sheets</h2>' +
-      '<div class="mut" style="margin-top:4px">What every finished player missed. Anyone still playing isn&#39;t here yet.</div>' +
-      (k.members.length
-        ? k.members.map((m) =>
-            '<details class="ksheet"><summary><b>' + esc(m.name) + "</b> &mdash; " + m.score + "/30 &middot; missed " + m.missed.length + "</summary>" +
-            (m.missed.length
-              ? m.missed.map((q) =>
-                  '<div class="miss"><div class="miss-q">' + esc(q.prompt) + "</div>" +
-                  '<div class="miss-a">Their answer: ' + (q.their_answer != null ? esc(q.their_answer) : "no answer") + "</div>" +
-                  '<div class="miss-c">Correct: ' + esc(q.correct) + "</div></div>").join("")
-              : '<div class="mut" style="padding:8px 0">Perfect sheet. Annoying.</div>') +
-            "</details>").join("")
-        : '<div class="mut" style="margin-top:10px">Nobody else has finished yet &mdash; their sheets appear here the moment they do.</div>') +
-      "</div>";
-    return own + league;
+    const openSlots = Math.max(0, (k.member_count ?? 0) - k.players.length);
+    const rows = k.players.map((p) => {
+      if (!p.finished) {
+        return '<div class="ksheet krow-pending"><div class="krow-head"><b>' + esc(p.name) + "</b>" +
+          '<span class="tag gray">Pending</span></div>' +
+          '<button class="btn ghost small" data-invite="1">Invite</button></div>';
+      }
+      const label = esc(p.name) + (p.is_you ? " (you)" : "");
+      return '<details class="ksheet"' + (p.is_you ? " open" : "") + '><summary><b>' + label + "</b> &mdash; " +
+        p.score + "/30 &middot; missed " + p.missed.length + "</summary>" +
+        (p.missed.length
+          ? p.missed.map((q) =>
+              '<div class="miss"><div class="miss-q">' + esc(q.prompt) + "</div>" +
+              '<div class="miss-a">' + (p.is_you ? "Your" : "Their") + " answer: " + (q.answer != null ? esc(q.answer) : "no answer") + "</div>" +
+              '<div class="miss-c">Correct: ' + esc(q.correct) + "</div>" +
+              (q.explanation ? '<div class="miss-x">' + esc(q.explanation) + "</div>" : "") + "</div>").join("")
+          : '<div class="mut" style="padding:8px 0">Perfect sheet. Annoying.</div>') +
+        "</details>";
+    }).join("");
+    let slots = "";
+    for (let i = 0; i < openSlots; i++) {
+      slots += '<div class="ksheet krow-pending"><div class="krow-head"><b class="mut">Open slot</b>' +
+        '<span class="tag gray">Pending</span></div>' +
+        '<button class="btn ghost small" data-invite="1">Invite</button></div>';
+    }
+    return '<div class="card" style="text-align:left"><h2>The Answer Key</h2>' +
+      '<div class="mut" style="margin-top:4px">Missed questions only, player by player. Anyone marked pending hasn&#39;t played yet &mdash; come back once everyone has gone to see their answers.</div>' +
+      rows + slots + "</div>";
   }
   // Finished but not purchased: the social-curiosity upsell.
   if (S.key_locked) {
     return '<div class="card" style="text-align:left"><h2>See everyone&#39;s answers</h2>' +
       '<div class="sub">Every question you missed, and every question they missed. Find out who actually knew what.</div>' +
       '<button class="btn" data-buykey="1">Unlock the answer key &mdash; $' + (S.key_price ?? 5) + "</button>" +
-      '<div class="mut center" style="margin-top:8px;font-size:12px">Mock checkout &mdash; yours the moment you tap. Covers your access only.</div></div>';
+      '<div class="mut center" style="margin-top:8px;font-size:12px">You&#39;ll create a free account at checkout. Mock checkout &mdash; payments aren&#39;t live yet. Covers your access only.</div></div>';
   }
   // Hasn't finished: locked, with the reason.
   if (S.key_teaser) {
@@ -253,6 +287,15 @@ function loadTrexAssets() {
     // of view, worst on retina phones. The game plays fine without it.
     Runner.prototype.setArcadeMode = function () {};
     Runner.prototype.setArcadeModeContainerScale = function () {};
+    // Between runs, the stock game restarts on any tap/space after a crash.
+    // Our between-run screen must be the only way to start the next run, so
+    // every internal restart path is gated behind an explicit allowance.
+    const origRestart = Runner.prototype.restart;
+    Runner.prototype.restart = function () {
+      if (!window.__dashAllowRestart) return;
+      window.__dashAllowRestart = false;
+      origRestart.call(this);
+    };
     // Emit a crash event carrying the displayed score.
     var orig = Runner.prototype.gameOver;
     Runner.prototype.gameOver = function () {
@@ -305,7 +348,7 @@ function renderReveal(el, standings, opts) {
 /* ================= member flow ================= */
 function memberView(TOKEN) {
   let S = null, deadlinePerf = null, expiredNotified = false, selected = null, busy = false;
-  let Q = null, total = 0, localIdx = 0, queue = Promise.resolve(), lastPhase = null;
+  let Q = null, total = 0, localIdx = 0, queue = Promise.resolve(), lastPhase = null, lastKeySig = "";
   const ptKey = "pt_" + TOKEN;
 
   const api = async (path, body) => {
@@ -337,7 +380,10 @@ function memberView(TOKEN) {
     }
     // Poll updates on the done screen patch the leaderboard in place — a full
     // re-render would reset the reader's scroll position every 5 seconds.
-    if (S.phase === "done" && lastPhase === "done" && $("#lbWrap")) {
+    // But if the answer-key state changed (e.g. a purchase just landed), we
+    // MUST re-render fully or the new key never appears.
+    const keySig = S.answer_key ? "open" : S.key_locked ? "locked" : S.key_teaser ? "teaser" : "";
+    if (S.phase === "done" && lastPhase === "done" && keySig === lastKeySig && $("#lbWrap")) {
       const lb = S.leaderboard || [];
       $("#lbWrap").innerHTML = lb.length
         ? lbRowsHtml(lb, true)
@@ -346,6 +392,7 @@ function memberView(TOKEN) {
       if (lc) lc.textContent = S.finished + " of " + S.league.member_count + " finished";
       return;
     }
+    lastKeySig = keySig;
     render();
   }
   async function refresh() {
@@ -466,7 +513,7 @@ function memberView(TOKEN) {
         ? '<b style="color:var(--danger)">This run counts.</b> Tap anywhere below (or press Space) to jump.'
         : "Tap anywhere below (or press Space) to jump. Run ends when you crash.";
       if (pad) { pad.classList.remove("idle"); pad.innerHTML = '<span class="tp-arrow">&#9650;</span> Tap to jump'; }
-      if (dino) dino.restart();
+      if (dino) { window.__dashAllowRestart = true; dino.restart(); }
     };
   }
 
@@ -504,27 +551,60 @@ function memberView(TOKEN) {
       if (window.__dino && window.__dino.stopListening) { try { window.__dino.stopListening(); } catch (e) {} }
       Runner.instance_ = null;
       dino = window.__dino = new Runner("#trexCont");
-      // "The Dash": replace Google's dinosaur with a generic runner character.
+      // "The Dash": the character is a ball-carrier — dark-skinned runner in a
+      // navy jersey and helmet, football tucked, legs striding.
       const proto = Object.getPrototypeOf(dino.tRex);
       if (!proto.__dashSkin) {
         proto.__dashSkin = true;
         proto.draw = function () {
           const ctx = this.canvasCtx;
           const duck = this.ducking;
-          const w = duck ? 52 : 34, h = duck ? 20 : 40;
-          const x = this.xPos + 2, y = this.yPos + (duck ? 22 : 3);
+          const x = this.xPos, y = this.yPos;
+          const SKIN = "#8A5A2B", JERSEY = "#1E2942", PANTS = "#5A6379",
+                BALL = "#7B4222", TRIM = "#FFB01F";
+          const step = Math.floor(Date.now() / 90) % 2;
           ctx.save();
-          ctx.fillStyle = "#1E2942";
-          if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(x, y, w, h, 7); ctx.fill(); }
-          else ctx.fillRect(x, y, w, h);
-          ctx.fillStyle = "#FFB01F"; // visor, facing the obstacles
-          ctx.fillRect(x + w - 12, y + (duck ? 5 : 7), 9, 5);
-          if (!duck) {
-            const step = Math.floor(Date.now() / 90) % 2;
-            ctx.fillStyle = "#1E2942";
-            ctx.fillRect(x + 4 + (step ? 5 : 0), y + h, 7, 4);
-            ctx.fillRect(x + w - 12 - (step ? 5 : 0), y + h, 7, 4);
+          if (duck) {
+            // sliding low: body horizontal
+            ctx.fillStyle = JERSEY; ctx.fillRect(x + 8, y + 26, 30, 12);
+            ctx.fillStyle = PANTS;  ctx.fillRect(x, y + 30, 12, 8);
+            ctx.fillStyle = SKIN;   ctx.fillRect(x + 36, y + 27, 6, 6); // head low
+            ctx.fillStyle = JERSEY; ctx.fillRect(x + 34, y + 24, 10, 5); // helmet
+            ctx.fillStyle = BALL;
+            ctx.beginPath(); ctx.ellipse(x + 26, y + 34, 6, 3.6, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.restore(); return;
           }
+          // legs (stride)
+          ctx.fillStyle = PANTS;
+          if (step) {
+            ctx.fillRect(x + 8, y + 30, 6, 14);              // back leg down
+            ctx.fillRect(x + 20, y + 28, 6, 9);              // front leg lifted
+            ctx.fillRect(x + 20, y + 35, 10, 5);             // front shin forward
+          } else {
+            ctx.fillRect(x + 10, y + 28, 6, 9);
+            ctx.fillRect(x + 4, y + 35, 10, 5);
+            ctx.fillRect(x + 20, y + 30, 6, 14);
+          }
+          // torso: jersey, leaning forward
+          ctx.fillStyle = JERSEY;
+          ctx.beginPath();
+          ctx.moveTo(x + 6, y + 12); ctx.lineTo(x + 26, y + 8);
+          ctx.lineTo(x + 30, y + 30); ctx.lineTo(x + 8, y + 32);
+          ctx.closePath(); ctx.fill();
+          ctx.fillStyle = TRIM; ctx.fillRect(x + 14, y + 16, 8, 3); // jersey number bar
+          // ball arm: skin forearm cradling the football at the front
+          ctx.fillStyle = SKIN; ctx.fillRect(x + 24, y + 16, 10, 5);
+          ctx.fillStyle = BALL;
+          ctx.beginPath(); ctx.ellipse(x + 32, y + 20, 6.5, 4, -0.3, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = "#EDEFF5"; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(x + 29, y + 20.8); ctx.lineTo(x + 35, y + 19); ctx.stroke();
+          // head: skin + helmet + facemask
+          ctx.fillStyle = SKIN; ctx.fillRect(x + 26, y + 3, 8, 8);
+          ctx.fillStyle = JERSEY;
+          ctx.beginPath(); ctx.arc(x + 29, y + 5.5, 6.4, Math.PI * 0.85, Math.PI * 2.05); ctx.fill();
+          ctx.fillStyle = TRIM; ctx.fillRect(x + 24, y + 1, 10, 2); // helmet stripe
+          ctx.strokeStyle = JERSEY; ctx.lineWidth = 1.6;
+          ctx.beginPath(); ctx.moveTo(x + 33, y + 8); ctx.lineTo(x + 37, y + 7); ctx.stroke(); // facemask
           ctx.restore();
         };
       }
@@ -742,9 +822,25 @@ function memberView(TOKEN) {
   }
 
   function wireKeyBuy() {
+    document.querySelectorAll("[data-invite]").forEach((b) => {
+      b.onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(SITE + "#/c/" + TOKEN);
+          b.textContent = "Link copied!";
+          setTimeout(() => (b.textContent = "Invite"), 1600);
+        } catch {}
+      };
+    });
     const b = document.querySelector("[data-buykey]");
     if (!b) return;
     b.onclick = async () => {
+      // Checkout requires an account: park the intent, run signup, and the
+      // auth handler completes the grant and returns to this results page.
+      if (!localStorage.getItem("adm")) {
+        localStorage.setItem("key_intent", JSON.stringify({ token: TOKEN, competition_id: S.competition_id }));
+        location.hash = "#/admin/signup";
+        return;
+      }
       b.disabled = true;
       const label = b.textContent;
       b.textContent = "Unlocking\u2026";
@@ -755,7 +851,7 @@ function memberView(TOKEN) {
           body: JSON.stringify({ sku: "answer_key", competition_id: S.competition_id }),
         }).then((x) => x.json());
         if (r.error) { b.disabled = false; b.textContent = label; alert(r.error); return; }
-        refresh(); // delivery is immediate: next state carries the full key
+        await refresh(); // key-state change forces a full re-render now
       } catch { b.disabled = false; b.textContent = label; }
     };
   }
@@ -842,6 +938,22 @@ function renderLogin(error, mode) {
     if (r.error) { $("#authErr").textContent = r.error; return; }
     localStorage.setItem("adm", r.token);
     localStorage.removeItem("ref_share");
+    const intentRaw = localStorage.getItem("key_intent");
+    if (intentRaw) {
+      // They came here from "Unlock the answer key": finish the purchase and
+      // land back on their results page with the key open.
+      localStorage.removeItem("key_intent");
+      try {
+        const intent = JSON.parse(intentRaw);
+        await fetch(API + "/api/entitlements/grant", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-pt": localStorage.getItem("pt_" + intent.token) || "" },
+          body: JSON.stringify({ sku: "answer_key", competition_id: intent.competition_id }),
+        });
+        location.hash = "#/c/" + intent.token;
+        return;
+      } catch {}
+    }
     location.hash = "#/admin";
     adminHome();
   };
@@ -874,21 +986,62 @@ async function adminHome() {
     <div class="card">
       <h2>New competition</h2>
       <label>Game type</label>
-      <select id="ctype">
-        <option value="wonderlic">Draft Day Aptitude Test — 30 questions, 6 minutes</option>
-        <option value="trex">The Dash — game of skill</option>
-        <option value="combine">The Skill and Wit Combine — both events${d.entitlements && d.entitlements.ultimate ? "" : " 🔒 Ultimate"}</option>
-        <option value="random_order">Random order draw</option>
-      </select>
+      <div class="gtype-grid" id="gtypeGrid">
+        <button type="button" class="gtype sel" data-gt="wonderlic">
+          ${GT_ICONS.wonderlic}
+          <b>Wonderlic-Style Test</b>
+          <span>30 questions, 6:00 on the clock, one try. Highest score picks first.</span>
+        </button>
+        <button type="button" class="gtype" data-gt="trex">
+          ${GT_ICONS.trex}
+          <b>Runner Game</b>
+          <span>Jump the cacti. 3 practice runs, then one run that counts.</span>
+        </button>
+        <button type="button" class="gtype" data-gt="combine">
+          <span class="gtype-prem">&#9733; ULTIMATE</span>
+          ${GT_ICONS.combine}
+          <b>Combine</b>
+          <span>League members take both the test and the runner, and positions are averaged &mdash; like a true combine.</span>
+        </button>
+      </div>
       <label>League name</label><input type="text" id="lname" maxlength="60" placeholder="e.g. The Sunday Regrets">
       <label>Number of members</label><input type="number" id="lmembers" value="12" min="2" max="64">
       <div class="err" id="lerr"></div>
       <button class="btn" id="lcreate">Create competition</button>
     </div></div>`;
   $("#logoutBtn").onclick = () => { localStorage.removeItem("adm"); renderLogin(); };
+  let selectedType = "wonderlic";
+  const markSelected = () => {
+    document.querySelectorAll(".gtype").forEach((b) =>
+      b.classList.toggle("sel", b.dataset.gt === selectedType));
+  };
+  document.querySelectorAll(".gtype").forEach((b) => {
+    b.onclick = () => {
+      const t = b.dataset.gt;
+      if (t === "combine" && !(d.entitlements && d.entitlements.ultimate)) {
+        // Premium card: the upsell fires on the click itself.
+        openUltimateModal(
+          (d.prices && d.prices.ultimate) || 19,
+          async () => {
+            const g = await aapi("/api/entitlements/grant", { sku: "ultimate" });
+            if (g.error) { $("#lerr").textContent = g.error; return; }
+            d.entitlements = d.entitlements || {};
+            d.entitlements.ultimate = true;
+            selectedType = "combine";
+            markSelected();
+          },
+          () => { markSelected(); } // Not now: selection stays where it was
+        );
+        return;
+      }
+      selectedType = t;
+      markSelected();
+    };
+  });
+
   $("#lcreate").onclick = () => {
     const payload = {
-      type: $("#ctype").value, name: $("#lname").value, member_count: Number($("#lmembers").value),
+      type: selectedType, name: $("#lname").value, member_count: Number($("#lmembers").value),
     };
     $("#lerr").textContent = "";
     const doCreate = async () => {
