@@ -422,6 +422,35 @@ export async function submitAnswer(
   return { done: false, attempt: updated };
 }
 
+// Batch form: apply every queued answer in one request — one state read,
+// one write. This is what keeps "locking in" instant even when the member
+// answers faster than their network drains.
+export async function submitAnswers(comp: any, attempt: any, items: any[]) {
+  const ms = await remainingMs(attempt);
+  if (ms <= 0) {
+    const finalized = await finalizeAttempt(attempt, comp, true);
+    return { done: true, attempt: finalized, timedOut: true };
+  }
+  const st = attemptState(attempt);
+  for (const it of items) {
+    const qid = String(it?.question_id ?? "");
+    const expected = st.question_order[st.current_index];
+    if (qid !== expected) continue;
+    if (st.answers[qid] !== undefined) continue;
+    const mapping = st.option_orders[qid];
+    const d = Number(it?.displayed_index);
+    st.answers[qid] = Number.isInteger(d) && d >= 0 && d <= 3 ? mapping[d] : null;
+    st.current_index += 1;
+  }
+  const [updated] = await sql`
+    update attempts set state = ${sql.json(st)} where id = ${attempt.id} returning *`;
+  if (st.current_index >= st.question_order.length) {
+    const finalized = await finalizeAttempt(updated, comp, false);
+    return { done: true, attempt: finalized };
+  }
+  return { done: false, attempt: updated, remaining_ms: ms, current_index: st.current_index };
+}
+
 // Record one T-Rex run (practice or real). Scores are clamped to what's
 // physically possible in the elapsed session time (~13 points/sec in-game).
 export async function submitRun(comp: any, attempt: any, rawScore: number) {

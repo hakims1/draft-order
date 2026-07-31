@@ -1,7 +1,7 @@
 "use strict";
 /* Draft Order Competition — SPA. API lives on a Supabase Edge Function. */
 const API = "https://bwxsuybqhgocmwncxzlz.supabase.co/functions/v1/draftday";
-const APP_VERSION = 21;
+const APP_VERSION = 22;
 
 /* Stale-cache self-heal: if the server says a newer frontend exists, reload
    once with a cache-busting query. Guarded so it can never loop. */
@@ -362,6 +362,7 @@ function renderReveal(el, standings, opts) {
 function memberView(TOKEN) {
   let S = null, deadlinePerf = null, expiredNotified = false, selected = null, busy = false;
   let Q = null, total = 0, localIdx = 0, queue = Promise.resolve(), lastPhase = null, lastKeySig = "";
+  let pendingAnswers = [], pumping = false, finishing = false;
   const ptKey = "pt_" + TOKEN;
 
   const api = async (path, body) => {
@@ -424,12 +425,34 @@ function memberView(TOKEN) {
     if (left <= 0 && !expiredNotified) { expiredNotified = true; refresh(); }
   }
 
-  // Answer acks ride a background queue: the UI advances instantly and only
-  // the clock re-sync (or a server-side finalization) comes back to us.
+  // Answer acks ride a background pump: the UI advances instantly, queued
+  // answers are sent as ONE batched request, and only the clock re-sync (or a
+  // server-side finalization) comes back to us.
   function handleAck(r) {
     if (!r || !viewActive()) return;
     if (r.phase && r.phase !== "question") { setState(r); return; }
     if (r.remaining_ms != null) { deadlinePerf = performance.now() + r.remaining_ms; expiredNotified = false; }
+  }
+
+  function pumpAnswers() {
+    if (pumping || !pendingAnswers.length || !viewActive()) return;
+    pumping = true;
+    const batch = pendingAnswers;
+    pendingAnswers = [];
+    api("/answers", { answers: batch })
+      .then((r) => {
+        pumping = false;
+        handleAck(r);
+        if (pendingAnswers.length) { pumpAnswers(); return; }
+        // All sent; if we've locally finished but the server says otherwise
+        // (e.g. a dropped batch), re-sync rather than hanging on "locking in".
+        if (finishing && r && r.phase === "question") refresh();
+      })
+      .catch(() => {
+        pumping = false;
+        pendingAnswers = batch.concat(pendingAnswers); // preserve order, retry
+        setTimeout(pumpAnswers, 1200);
+      });
   }
 
   function renderQuestion() {
@@ -456,16 +479,15 @@ function memberView(TOKEN) {
     $("#nextBtn").onclick = () => {
       if (selected == null) return;
       const pick = selected;
-      queue = queue
-        .then(() => api("/answer", { question_id: q.id, displayed_index: pick }))
-        .then(handleAck)
-        .catch(() => {});
+      pendingAnswers.push({ question_id: q.id, displayed_index: pick });
+      pumpAnswers();
       localIdx++;
       if (localIdx >= total) {
+        finishing = true;
         clearTimers();
         app().innerHTML = '<div class="fade-in center" style="padding-top:80px"><h2>Locking in your answers&hellip;</h2></div>';
         window.scrollTo(0, 0);
-        queue = queue.then(() => refresh());
+        pumpAnswers();
         addTimer(setInterval(refresh, 3000)); // safety net if the final ack is lost
       } else {
         renderQuestion();
@@ -585,62 +607,85 @@ function memberView(TOKEN) {
       if (window.__dino && window.__dino.stopListening) { try { window.__dino.stopListening(); } catch (e) {} }
       Runner.instance_ = null;
       dino = window.__dino = new Runner("#trexCont");
-      // "The Dash": the character is a ball-carrier — dark-skinned runner in a
-      // navy jersey and helmet, football tucked, legs striding.
+      // "The Dash": the character is a cartoon ball-carrier — ball tucked in
+      // one arm, the other extended in a stiff-arm, high-knee stride.
       const proto = Object.getPrototypeOf(dino.tRex);
       if (!proto.__dashSkin) {
         proto.__dashSkin = true;
         proto.draw = function () {
           const ctx = this.canvasCtx;
           const duck = this.ducking;
-          const x = this.xPos, y = this.yPos;
-          const SKIN = "#8A5A2B", JERSEY = "#1E2942", PANTS = "#5A6379",
-                BALL = "#7B4222", TRIM = "#FFB01F";
-          const step = Math.floor(Date.now() / 90) % 2;
+          const X = this.xPos, Y = this.yPos;
+          const SKIN = "#8A5A2B", JERSEY = "#1E2942", PANTS = "#E8EAF0",
+                SOCK = "#C9A44C", CLEAT = "#20242E", BALL = "#7B4222", TRIM = "#FFB01F",
+                MASK = "#9AA3B5";
+          const step = this.jumping ? 0 : Math.floor(Date.now() / 110) % 2;
+          const limb = (x1, y1, x2, y2, w, color) => {
+            ctx.strokeStyle = color; ctx.lineWidth = w; ctx.lineCap = "round";
+            ctx.beginPath(); ctx.moveTo(X + x1, Y + y1); ctx.lineTo(X + x2, Y + y2); ctx.stroke();
+          };
           ctx.save();
           if (duck) {
-            // sliding low: body horizontal
-            ctx.fillStyle = JERSEY; ctx.fillRect(x + 8, y + 26, 30, 12);
-            ctx.fillStyle = PANTS;  ctx.fillRect(x, y + 30, 12, 8);
-            ctx.fillStyle = SKIN;   ctx.fillRect(x + 36, y + 27, 6, 6); // head low
-            ctx.fillStyle = JERSEY; ctx.fillRect(x + 34, y + 24, 10, 5); // helmet
+            // low slide: ball clutched, body horizontal
+            limb(10, 34, 30, 30, 9, JERSEY);            // torso
+            limb(2, 40, 12, 36, 6, PANTS);              // trailing leg
+            limb(30, 32, 42, 38, 6, PANTS);             // lead leg
+            ctx.fillStyle = SKIN; ctx.fillRect(X + 34, Y + 24, 8, 7);   // head
+            ctx.fillStyle = JERSEY;
+            ctx.beginPath(); ctx.arc(X + 38, Y + 26, 6, Math.PI, Math.PI * 2); ctx.fill();
             ctx.fillStyle = BALL;
-            ctx.beginPath(); ctx.ellipse(x + 26, y + 34, 6, 3.6, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(X + 22, Y + 36, 6, 3.6, 0, 0, Math.PI * 2); ctx.fill();
             ctx.restore(); return;
           }
-          // legs (stride)
-          ctx.fillStyle = PANTS;
+          // back leg: extended behind (pants + sock + cleat)
           if (step) {
-            ctx.fillRect(x + 8, y + 30, 6, 14);              // back leg down
-            ctx.fillRect(x + 20, y + 28, 6, 9);              // front leg lifted
-            ctx.fillRect(x + 20, y + 35, 10, 5);             // front shin forward
+            limb(14, 28, 6, 38, 6, PANTS); limb(6, 38, 4, 43, 4, SOCK);
+            ctx.fillStyle = CLEAT; ctx.fillRect(X, Y + 43, 9, 4);
           } else {
-            ctx.fillRect(x + 10, y + 28, 6, 9);
-            ctx.fillRect(x + 4, y + 35, 10, 5);
-            ctx.fillRect(x + 20, y + 30, 6, 14);
+            limb(14, 28, 10, 40, 6, PANTS); limb(10, 40, 9, 44, 4, SOCK);
+            ctx.fillStyle = CLEAT; ctx.fillRect(X + 5, Y + 43, 9, 4);
           }
-          // torso: jersey, leaning forward
+          // torso: leaning forward
           ctx.fillStyle = JERSEY;
           ctx.beginPath();
-          ctx.moveTo(x + 6, y + 12); ctx.lineTo(x + 26, y + 8);
-          ctx.lineTo(x + 30, y + 30); ctx.lineTo(x + 8, y + 32);
+          ctx.moveTo(X + 14, Y + 12); ctx.lineTo(X + 28, Y + 10);
+          ctx.lineTo(X + 24, Y + 30); ctx.lineTo(X + 12, Y + 30);
           ctx.closePath(); ctx.fill();
-          ctx.fillStyle = TRIM; ctx.fillRect(x + 14, y + 16, 8, 3); // jersey number bar
-          // ball arm: skin forearm cradling the football at the front
-          ctx.fillStyle = SKIN; ctx.fillRect(x + 24, y + 16, 10, 5);
+          ctx.fillStyle = TRIM; ctx.fillRect(X + 16, Y + 15, 9, 3); // number bar
+          // tucked arm + football against the chest
+          limb(24, 15, 16, 23, 5, SKIN);
           ctx.fillStyle = BALL;
-          ctx.beginPath(); ctx.ellipse(x + 32, y + 20, 6.5, 4, -0.3, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(X + 19, Y + 24, 6.5, 4, -0.35, 0, Math.PI * 2); ctx.fill();
           ctx.strokeStyle = "#EDEFF5"; ctx.lineWidth = 1;
-          ctx.beginPath(); ctx.moveTo(x + 29, y + 20.8); ctx.lineTo(x + 35, y + 19); ctx.stroke();
-          // head: skin + helmet + facemask
-          ctx.fillStyle = SKIN; ctx.fillRect(x + 26, y + 3, 8, 8);
+          ctx.beginPath(); ctx.moveTo(X + 16, Y + 25.6); ctx.lineTo(X + 22, Y + 22.4); ctx.stroke();
+          // front leg: high knee stride
+          if (step) {
+            limb(16, 29, 26, 32, 6, PANTS); limb(26, 32, 27, 41, 5, SOCK);
+            ctx.fillStyle = CLEAT; ctx.fillRect(X + 24, Y + 41, 10, 4);
+          } else {
+            limb(16, 29, 24, 36, 6, PANTS); limb(24, 36, 30, 43, 5, SOCK);
+            ctx.fillStyle = CLEAT; ctx.fillRect(X + 28, Y + 43, 10, 4);
+          }
+          // helmet: shell, amber stripe, facemask
+          ctx.fillStyle = SKIN; ctx.fillRect(X + 24, Y + 2, 9, 9);
           ctx.fillStyle = JERSEY;
-          ctx.beginPath(); ctx.arc(x + 29, y + 5.5, 6.4, Math.PI * 0.85, Math.PI * 2.05); ctx.fill();
-          ctx.fillStyle = TRIM; ctx.fillRect(x + 24, y + 1, 10, 2); // helmet stripe
-          ctx.strokeStyle = JERSEY; ctx.lineWidth = 1.6;
-          ctx.beginPath(); ctx.moveTo(x + 33, y + 8); ctx.lineTo(x + 37, y + 7); ctx.stroke(); // facemask
+          ctx.beginPath(); ctx.arc(X + 28, Y + 6, 7, Math.PI * 0.75, Math.PI * 2.1); ctx.fill();
+          ctx.fillStyle = TRIM; ctx.fillRect(X + 23, Y - 1, 11, 2.4);
+          ctx.strokeStyle = MASK; ctx.lineWidth = 1.4;
+          ctx.beginPath(); ctx.moveTo(X + 32, Y + 6); ctx.lineTo(X + 38, Y + 5); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(X + 32, Y + 9); ctx.lineTo(X + 37, Y + 8); ctx.stroke();
+          // stiff-arm: extended up-forward with an open hand
+          limb(26, 13, 40, 5, 5, SKIN);
+          ctx.fillStyle = SKIN;
+          ctx.beginPath(); ctx.arc(X + 41, Y + 4, 3.2, 0, Math.PI * 2); ctx.fill();
           ctx.restore();
         };
+        // The Runner painted the sprite dinosaur once during init, before this
+        // patch existed. Wipe and repaint so the FIRST visible frame is the
+        // ball-carrier, not the dino.
+        dino.clearCanvas();
+        try { dino.horizon.update(0, 0, true); } catch (e) {}
+        dino.tRex.draw(0, 0);
       }
       armCrash();
       const isReal = S.run_index >= S.practice_runs;

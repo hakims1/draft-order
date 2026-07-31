@@ -24,13 +24,14 @@ import {
   realRunIndex,
   startAttempt,
   submitAnswer,
+  submitAnswers,
   submitRun,
 } from "./logic.ts";
 import { checkGate, hasEntitlement, isOwner, logEvent } from "./gates.ts";
 
 const FN = "draftday";
 // Bumped with every frontend release; stale clients hard-reload themselves.
-const APP_VERSION = 21;
+const APP_VERSION = 22;
 // Public site (GitHub Pages). Share/results URLs are built against this.
 const SITE = (Deno.env.get("SITE_ORIGIN") ?? "https://hakims1.github.io/draft-order/").replace(/\/?$/, "/");
 
@@ -293,6 +294,23 @@ app.post("/c/:token/run", async (c) => {
     await submitRun(comp, attempt, Number(body.score));
   }
   return c.json(await memberState(c, comp));
+});
+
+// Batched answers: the fast path. Mid-test acks skip the full state rebuild;
+// only the finalizing batch pays for a complete member state.
+app.post("/c/:token/answers", async (c) => {
+  const comp = await competitionByShareToken(c.req.param("token"));
+  if (!comp) return c.json({ phase: "error", error: "Competition not found." }, 404);
+  const participant = await participantBySession(comp.id, c.req.header("x-pt"));
+  const attempt = participant ? await currentAttempt(participant.id, "wonderlic") : null;
+  if (!attempt || attempt.status !== "in_progress") {
+    return c.json(await memberState(c, comp));
+  }
+  const body = await c.req.json().catch(() => ({}));
+  const items = Array.isArray(body.answers) ? body.answers.slice(0, 40) : [];
+  const res = await submitAnswers(comp, attempt, items);
+  if (res.done) return c.json(await memberState(c, comp));
+  return c.json({ phase: "question", remaining_ms: res.remaining_ms, current_index: res.current_index });
 });
 
 app.post("/c/:token/answer", async (c) => {
