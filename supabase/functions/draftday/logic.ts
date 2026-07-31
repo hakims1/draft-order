@@ -94,6 +94,20 @@ export async function bankQuestions(bankVersion: number) {
     from questions where bank_version = ${bankVersion} order by position`;
 }
 
+// The competition's question set: a per-competition random sample when one
+// was drawn at creation (bank v3+), else the whole bank (v1/v2 legacy).
+export async function compQuestions(comp: any) {
+  const ids = comp.config?.question_ids;
+  if (Array.isArray(ids) && ids.length) {
+    const rows = await sql`
+      select id, position, prompt, options, correct_index, explanation
+      from questions where id = any(${ids})`;
+    const map = new Map(rows.map((r: any) => [r.id, r]));
+    return ids.map((id: string) => map.get(id)).filter(Boolean);
+  }
+  return await bankQuestions(comp.config?.bank_version ?? 1);
+}
+
 // A participant is "finished" once every event of the competition is finished.
 export async function finishedCount(comp: any): Promise<number> {
   const events = eventsFor(comp);
@@ -306,9 +320,8 @@ export async function startAttempt(comp: any, participant: any, eventKey: string
     state = { runs: [] };
     limitSec = cfg.session_limit_seconds ?? 900;
   } else {
-    const bankVersion = cfg.bank_version ?? 1;
     limitSec = cfg.time_limit_seconds ?? 360;
-    const questions = await bankQuestions(bankVersion);
+    const questions = await compQuestions(comp);
     const order = seededShuffle(questions.map((q: any) => q.id), `q:${participant.shuffle_seed}`);
     const optionOrders: Record<string, number[]> = {};
     for (const q of questions) {
@@ -339,7 +352,7 @@ async function scoreAttempt(attempt: any, comp: any): Promise<number> {
     const real = runs[realRunIndex(comp)];
     return real ? Number(real.score) || 0 : 0;
   }
-  const questions = await bankQuestions(comp.config?.bank_version ?? 1);
+  const questions = await compQuestions(comp);
   const answers = attemptState(attempt).answers ?? {};
   let score = 0;
   for (const q of questions) {
@@ -448,7 +461,7 @@ export async function participantKeyEntitled(participantId: string): Promise<boo
 // with their missed questions (missed only, with explanations), unfinished
 // players as pending. The buyer's own row is flagged.
 export async function buildAnswerKey(comp: any, buyer: any) {
-  const bank = await bankQuestions(comp.config?.bank_version ?? 1);
+  const bank = await compQuestions(comp);
   const rows = await sql`
     select p.id, p.display_name, p.real_name, a.status, a.score, a.state
     from participants p
@@ -495,9 +508,7 @@ export async function closeCompetition(competitionId: string) {
         select a.*, p.competition_id from attempts a
         join participants p on p.id = a.participant_id
         where p.competition_id = ${competitionId} and a.status = 'in_progress'`;
-      const questions = await tx`
-        select id, correct_index from questions
-        where bank_version = ${comp.config?.bank_version ?? 1}`;
+      const questions = await compQuestions(comp);
       for (const a of inProgress) {
         let score = 0;
         if (a.event_key === "trex") {

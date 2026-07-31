@@ -259,4 +259,4 @@ a { color: var(--accent); }
   background: linear-gradient(180deg, #FFC14A, #FFB01F);
   box-shadow: 0 4px 22px rgba(255, 176, 31, 0.38);
 }
-.btn[disabled] { opacity: 0.4; filter: saturate(0.4); box-shadow: none; }
+.btn[disabled] { opacity: 0.6; box-shadow: none; }

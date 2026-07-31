@@ -1,6 +1,19 @@
 "use strict";
 /* Draft Order Competition — SPA. API lives on a Supabase Edge Function. */
 const API = "https://bwxsuybqhgocmwncxzlz.supabase.co/functions/v1/draftday";
+const APP_VERSION = 20;
+
+/* Stale-cache self-heal: if the server says a newer frontend exists, reload
+   once with a cache-busting query. Guarded so it can never loop. */
+function maybeSelfHeal(serverVersion) {
+  if (!serverVersion || serverVersion <= APP_VERSION) return false;
+  if (sessionStorage.getItem("healed") === String(serverVersion)) return false;
+  sessionStorage.setItem("healed", String(serverVersion));
+  var u = new URL(location.href);
+  u.searchParams.set("v", String(serverVersion));
+  location.replace(u.toString());
+  return true;
+}
 const SITE = location.origin + location.pathname.replace(/index\.html$/, "");
 
 const app = () => document.getElementById("app");
@@ -370,6 +383,7 @@ function memberView(TOKEN) {
 
   function setState(next) {
     if (!viewActive()) return;
+    if (maybeSelfHeal(next && next.app_version)) return;
     S = next;
     if (S.remaining_ms != null) { deadlinePerf = performance.now() + S.remaining_ms; expiredNotified = false; }
     if (S.phase === "question") {
@@ -483,10 +497,30 @@ function memberView(TOKEN) {
     window.addEventListener("trex:crash", function (e) {
       if (!location.hash.includes(TOKEN)) return;
       const score = Math.round(e.detail.score);
+      // Instant feedback: the ack can take a couple of seconds on a cold
+      // function, and a silent gap here reads as "the game is stuck".
+      const msg0 = $("#runMsg"), pad0 = $("#tapPad");
+      if (msg0) msg0.innerHTML = "Run over &mdash; you scored <b>" + score + "</b>. Saving\u2026";
+      if (pad0) { pad0.classList.add("idle"); pad0.innerHTML = "Saving your run\u2026"; }
+      const showContinue = function (text) {
+        const msg = $("#runMsg"), btn = $("#runBtn");
+        if (!msg || !btn) return;
+        msg.textContent = text;
+        btn.style.display = "block";
+        btn.className = "btn";
+        btn.textContent = "Continue";
+        btn.onclick = function () { btn.style.display = "none"; refresh(); };
+      };
+      const slow = setTimeout(function () {
+        showContinue("Still saving \u2014 tap to continue.");
+      }, 6000);
       queue = queue
         .then(function () { return api("/run", { score: score }); })
-        .then(function (r) { handleRunAck(r, score); })
-        .catch(function () {});
+        .then(function (r) { clearTimeout(slow); handleRunAck(r, score); })
+        .catch(function () {
+          clearTimeout(slow);
+          showContinue("Connection hiccup \u2014 your run is safe. Tap to continue.");
+        });
     });
   }
 
@@ -642,8 +676,8 @@ function memberView(TOKEN) {
         '<div class="warnbox"><b>One sitting:</b> pressing start opens your Dash session &mdash; 3 practice runs, then the run that counts, with a 15:00 session limit.</div>' +
         '<button class="btn" id="goBtn">Start event 2</button></div></div>';
       $("#goBtn").onclick = async () => {
-        $("#goBtn").disabled = true;
-        try { setState(await api("/start", {})); } catch { const b = $("#goBtn"); if (b) b.disabled = false; }
+        if (busy) return; busy = true;
+        try { setState(await api("/start", {})); } finally { busy = false; }
       };
       return;
     }
@@ -733,7 +767,7 @@ function memberView(TOKEN) {
       if (nm && prevNm) nm.value = prevNm;
       if (rn && prevRn) rn.value = prevRn;
       $("#goBtn").onclick = async () => {
-        if (busy) return; busy = true; $("#goBtn").disabled = true;
+        if (busy) return; busy = true;
         try {
           if (S.phase === "join") {
             const name = ($("#nm").value || "").trim();
@@ -745,7 +779,7 @@ function memberView(TOKEN) {
             if (j.participant_token) localStorage.setItem(ptKey, j.participant_token);
           }
           setState(isW || isT || isC ? await api("/start", {}) : await api("/state.json"));
-        } finally { busy = false; const b = $("#goBtn"); if (b) b.disabled = false; }
+        } finally { busy = false; }
       };
       if (nm) nm.addEventListener("keydown", (e) => { if (e.key === "Enter" && rn) rn.focus(); });
       if (rn) rn.addEventListener("keydown", (e) => { if (e.key === "Enter") $("#goBtn").click(); });

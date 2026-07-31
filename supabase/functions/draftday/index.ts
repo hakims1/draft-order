@@ -5,6 +5,7 @@ import {
   PRICES,
   attemptsByEvent,
   bankQuestions,
+  compQuestions,
   buildAnswerKey,
   eventsFor,
   participantKeyEntitled,
@@ -28,6 +29,8 @@ import {
 import { checkGate, hasEntitlement, isOwner, logEvent } from "./gates.ts";
 
 const FN = "draftday";
+// Bumped with every frontend release; stale clients hard-reload themselves.
+const APP_VERSION = 20;
 // Public site (GitHub Pages). Share/results URLs are built against this.
 const SITE = (Deno.env.get("SITE_ORIGIN") ?? "https://hakims1.github.io/draft-order/").replace(/\/?$/, "/");
 
@@ -84,7 +87,7 @@ async function memberState(c: any, comp: any, light = false) {
   const league = { name: comp.name, member_count: comp.member_count };
   const displayCount = comp.type === "random_order" ? joined : finished;
   const events = eventsFor(comp);
-  const payload: any = { type: comp.type, league, finished: displayCount, competition_id: comp.id };
+  const payload: any = { type: comp.type, league, finished: displayCount, competition_id: comp.id, app_version: APP_VERSION };
   if (comp.type === "combine") payload.events = events;
 
   const atts: Record<string, any> = participant ? await attemptsByEvent(participant.id) : {};
@@ -234,7 +237,7 @@ async function memberState(c: any, comp: any, light = false) {
   // only needs the re-synced clock. Start/state responses carry everything so
   // the client never waits on the network between questions.
   if (!light) {
-    const questions = await bankQuestions(comp.config?.bank_version ?? 1);
+    const questions = await compQuestions(comp);
     const qmap = new Map(questions.map((q: any) => [q.id, q]));
     payload.questions = st.question_order.map((qid: string) => {
       const q: any = qmap.get(qid);
@@ -462,14 +465,27 @@ app.post("/api/admin/competitions", async (c) => {
   if (type === "combine" && !ultimate) {
     return c.json({ error: "The Skill and Wit Combine needs Ultimate.", upsell: "ultimate" });
   }
-  const config = type === "wonderlic"
-    ? { bank_version: 2, question_count: 30, time_limit_seconds: 360, max_attempts: 1 }
+  const config: any = type === "wonderlic"
+    ? { bank_version: 3, question_count: 30, time_limit_seconds: 360, max_attempts: 1 }
     : type === "trex"
     ? { practice_runs: 3, session_limit_seconds: 900, max_attempts: 1 }
     : type === "combine"
-    ? { events: ["wonderlic", "trex"], bank_version: 2, question_count: 30,
+    ? { events: ["wonderlic", "trex"], bank_version: 3, question_count: 30,
         time_limit_seconds: 360, practice_runs: 3, session_limit_seconds: 900, max_attempts: 1 }
     : { max_attempts: 1 };
+  // Draw this competition's 30 questions from the big bank — stratified so
+  // every test gets a mix of verbal, numeric, and reasoning items.
+  if (type === "wonderlic" || type === "combine") {
+    const pick = async (cats: string[], n: number) =>
+      (await sql`
+        select id from questions where bank_version = 3 and category = any(${cats})
+        order by random() limit ${n}`).map((r: any) => r.id);
+    config.question_ids = [
+      ...(await pick(["analogy", "word_relation"], 10)),
+      ...(await pick(["arithmetic", "number_series"], 10)),
+      ...(await pick(["logic", "calendar", "pattern"], 10)),
+    ];
+  }
   const [comp] = await sql`
     insert into competitions (admin_id, name, member_count, type, config)
     values (${admin.id}, ${name}, ${members}, ${type}, ${sql.json(config)})

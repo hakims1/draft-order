@@ -127,11 +127,14 @@ No schema migration needed:
 
 ## Question bank
 
-30 original questions in `bank_version 1` — verbal analogies, word relationships, number
-series, arithmetic word problems, logical deduction, proverb meaning, spatial/pattern,
-calendar reasoning, and sentence disambiguation. Difficulty mix: 10 easy / 12 medium /
-8 hard. Add a new bank by inserting rows with `bank_version = 2` and setting
-`config.bank_version` on new competitions; old results are untouched.
+Three banks. v1 (30, original hand-written) and v2 (30, no easy tier) are legacy;
+new competitions use **v3: ~1,100 generated + curated questions** (arithmetic, series,
+calendar, letter patterns, syllogisms with nonsense terms, curated analogies and
+vocabulary — all with computed answers and one-line explanations, no easy tier).
+Each competition samples a stratified 30 at creation (`config.question_ids`:
+10 verbal, 10 numeric, 10 reasoning), so different leagues get different tests.
+The generator lives in the migration `..._bank_v3.sql`; regenerate by editing the
+inline python in git history or adding a v4.
 
 ## Monetization gates & A/B experiments
 
