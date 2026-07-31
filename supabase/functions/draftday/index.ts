@@ -30,7 +30,7 @@ import { checkGate, hasEntitlement, isOwner, logEvent } from "./gates.ts";
 
 const FN = "draftday";
 // Bumped with every frontend release; stale clients hard-reload themselves.
-const APP_VERSION = 20;
+const APP_VERSION = 21;
 // Public site (GitHub Pages). Share/results URLs are built against this.
 const SITE = (Deno.env.get("SITE_ORIGIN") ?? "https://hakims1.github.io/draft-order/").replace(/\/?$/, "/");
 

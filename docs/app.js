@@ -1,7 +1,7 @@
 "use strict";
 /* Draft Order Competition — SPA. API lives on a Supabase Edge Function. */
 const API = "https://bwxsuybqhgocmwncxzlz.supabase.co/functions/v1/draftday";
-const APP_VERSION = 20;
+const APP_VERSION = 21;
 
 /* Stale-cache self-heal: if the server says a newer frontend exists, reload
    once with a cache-busting query. Guarded so it can never loop. */
@@ -179,7 +179,7 @@ function openUltimateModal(price, onPurchase, onSkip) {
       cta: "Unlock Ultimate \u2014 $" + price,
     },
     {
-      kicker: "The Combine \u00b7 Ultimate",
+      kicker: "The Proving Ground \u00b7 Ultimate",
       onPurchase,
       onSkip,
       features: [
