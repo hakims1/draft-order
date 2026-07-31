@@ -210,3 +210,17 @@ a { color: var(--accent); }
 .tap-pad:active { background: var(--panel); border-color: var(--accent); color: var(--accent); }
 .tap-pad.idle { opacity: .55; cursor: default; font-size: 14px; letter-spacing: 1px; }
 .trex-stage { touch-action: none; }
+
+/* ---- Ultimate modal feature list ---- */
+.feat { display: flex; gap: 14px; align-items: flex-start; margin-top: 16px; text-align: left; }
+.feat-ic { flex: 0 0 44px; width: 44px; height: 44px; }
+.feat-t b { font-size: 16px; }
+.feat-t .mut { font-size: 13px; margin-top: 2px; }
+.feat-note { color: var(--accent); font-size: 12px; margin-top: 4px; font-weight: 600; }
+
+/* ---- answer key ---- */
+.miss-x { color: var(--dim); font-size: 12px; margin-top: 3px; font-style: italic; }
+.ksheet { border-bottom: 1px solid var(--line); padding: 10px 0; }
+.ksheet:last-child { border-bottom: 0; }
+.ksheet summary { cursor: pointer; font-size: 15px; color: var(--text); }
+.ksheet summary::marker { color: var(--accent); }

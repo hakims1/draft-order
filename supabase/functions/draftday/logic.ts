@@ -43,6 +43,30 @@ export function attemptState(attempt: any): any {
   return typeof st === "string" ? JSON.parse(st) : (st ?? {});
 }
 
+// ---------- pricing (single source of truth; USD) ----------
+
+export const PRICES = { ultimate: 19, answer_key: 5 };
+
+// ---------- events ----------
+// Single-event competitions have one event matching their type. The Combine
+// runs a list of events; each event owns one attempt row per participant.
+
+export function eventsFor(comp: any): string[] {
+  if (comp.type === "combine") return comp.config?.events ?? ["wonderlic", "trex"];
+  return [comp.type];
+}
+
+// Latest attempt per event for a participant.
+export async function attemptsByEvent(participantId: string): Promise<Record<string, any>> {
+  const rows = await sql`
+    select distinct on (event_key) * from attempts
+    where participant_id = ${participantId}
+    order by event_key, attempt_number desc`;
+  const map: Record<string, any> = {};
+  for (const r of rows) map[r.event_key] = r;
+  return map;
+}
+
 // ---------- lookups ----------
 
 export async function competitionByShareToken(token: string) {
@@ -57,15 +81,19 @@ export async function competitionByResultsToken(token: string) {
 
 export async function bankQuestions(bankVersion: number) {
   return await sql`
-    select id, position, prompt, options, correct_index
+    select id, position, prompt, options, correct_index, explanation
     from questions where bank_version = ${bankVersion} order by position`;
 }
 
-export async function finishedCount(competitionId: string): Promise<number> {
+// A participant is "finished" once every event of the competition is finished.
+export async function finishedCount(comp: any): Promise<number> {
+  const events = eventsFor(comp);
   const [row] = await sql`
-    select count(*)::int as n from attempts a
-    join participants p on p.id = a.participant_id
-    where p.competition_id = ${competitionId} and a.status = 'finished'`;
+    select count(*)::int as n from participants p
+    where p.competition_id = ${comp.id} and not p.is_placeholder
+      and (select count(distinct a.event_key) from attempts a
+           where a.participant_id = p.id and a.status = 'finished'
+             and a.event_key = any(${events})) >= ${events.length}`;
   return row.n;
 }
 
@@ -75,6 +103,7 @@ export function standingsVisible(comp: any, finished: number): boolean {
 }
 
 export async function standings(comp: any) {
+  if (comp.type === "combine") return await combineStandings(comp);
   const rows = await sql`
     select p.display_name, p.real_name, p.is_dnf, p.is_placeholder, a.score, a.duration_ms
     from participants p
@@ -93,6 +122,86 @@ export async function standings(comp: any) {
   }));
 }
 
+// Combine ranking: rank each event separately with that event's normal sort,
+// then average the positions. Raw scores are never mixed — the test is bounded
+// 0–30 and the runner is unbounded, so score-averaging would let the runner
+// swamp the test. A missed event scores last place in that event (finishers+1),
+// so skipping a weak event can't help. Both event ranks and the average are
+// returned so the group chat can audit the arithmetic.
+async function combineStandings(comp: any) {
+  const events = eventsFor(comp);
+  const parts: any[] = await sql`
+    select * from participants where competition_id = ${comp.id} order by created_at`;
+  const atts: any[] = await sql`
+    select a.* from attempts a
+    join participants p on p.id = a.participant_id
+    where p.competition_id = ${comp.id} and a.status = 'finished'`;
+  const byPart = new Map<string, Record<string, any>>();
+  for (const a of atts) {
+    if (!byPart.has(a.participant_id)) byPart.set(a.participant_id, {});
+    byPart.get(a.participant_id)![a.event_key] = a;
+  }
+
+  const pool = parts.filter((p) => !p.is_dnf);
+  const ranks = new Map<string, Record<string, number>>();
+  for (const p of pool) ranks.set(p.id, {});
+  for (const ev of events) {
+    const finishers = pool
+      .filter((p) => byPart.get(p.id)?.[ev])
+      .sort((a, b) => {
+        const A = byPart.get(a.id)![ev], B = byPart.get(b.id)![ev];
+        if (Number(B.score) !== Number(A.score)) return Number(B.score) - Number(A.score);
+        if (A.duration_ms !== B.duration_ms) return A.duration_ms - B.duration_ms;
+        return new Date(A.finished_at).getTime() - new Date(B.finished_at).getTime();
+      });
+    finishers.forEach((p, i) => { ranks.get(p.id)![ev] = i + 1; });
+    const lastPlace = finishers.length + 1;
+    for (const p of pool) {
+      if (ranks.get(p.id)![ev] === undefined) ranks.get(p.id)![ev] = lastPlace;
+    }
+  }
+
+  const scored = pool.map((p) => {
+    const r = ranks.get(p.id)!;
+    const avg = events.reduce((s, ev) => s + r[ev], 0) / events.length;
+    const best = Math.min(...events.map((ev) => r[ev]));
+    const durations = events.map((ev) => byPart.get(p.id)?.[ev]?.duration_ms);
+    const totalDur = durations.reduce((s, d) => s + (d ?? 9e9), 0);
+    const eventScores: Record<string, number | null> = {};
+    for (const ev of events) {
+      const a = byPart.get(p.id)?.[ev];
+      eventScores[ev] = a ? Number(a.score) : null;
+    }
+    return { p, avg, best, totalDur, event_ranks: r, event_scores: eventScores };
+  }).sort((a, b) =>
+    a.avg - b.avg || a.best - b.best || a.totalDur - b.totalDur ||
+    new Date(a.p.created_at).getTime() - new Date(b.p.created_at).getTime());
+
+  const dnfs = parts.filter((p) => p.is_dnf);
+  const rows: any[] = [];
+  scored.forEach((s, i) => rows.push({
+    rank: i + 1,
+    name: s.p.display_name,
+    real_name: s.p.real_name,
+    dnf: false,
+    placeholder: s.p.is_placeholder,
+    score: Math.round(s.avg * 10) / 10,
+    duration_ms: s.totalDur >= 9e9 ? null : s.totalDur,
+    event_ranks: s.event_ranks,
+    event_scores: s.event_scores,
+  }));
+  dnfs.forEach((p, i) => rows.push({
+    rank: scored.length + i + 1,
+    name: p.display_name,
+    real_name: p.real_name,
+    dnf: true,
+    placeholder: p.is_placeholder,
+    score: null,
+    duration_ms: null,
+  }));
+  return rows;
+}
+
 // ---------- member flow ----------
 
 export async function joinCompetition(comp: any, name: string, realName = "") {
@@ -105,13 +214,17 @@ export async function joinCompetition(comp: any, name: string, realName = "") {
   return await sql.begin(async (tx) => {
     await tx`select id from competitions where id = ${comp.id} for update`;
     const existing = await tx`
-      select p.*, a.status as attempt_status from participants p
-      left join attempts a on a.participant_id = p.id
+      select p.* from participants p
       where p.competition_id = ${comp.id} and lower(p.display_name) = lower(${trimmed})`;
     if (existing.length) {
       const p = existing[0];
-      // Same name re-entering: allow resume unless their attempt already finished.
-      if (p.attempt_status === "finished" || p.is_dnf) {
+      // Same name re-entering: allow resume unless every event is already finished.
+      const events = eventsFor(comp);
+      const [{ fin }] = await tx`
+        select count(distinct event_key)::int as fin from attempts
+        where participant_id = ${p.id} and status = 'finished'
+          and event_key = any(${events})`;
+      if (fin >= events.length || p.is_dnf) {
         return { error: "That name has already completed. Pick a different name." };
       }
       return { participant: p };
@@ -147,9 +260,9 @@ async function generateRandomOrder(tx: any, competitionId: string) {
   }
   for (let i = 0; i < order.length; i++) {
     await tx`
-      insert into attempts (participant_id, status, started_at, finished_at, score, duration_ms)
-      values (${order[i].id}, 'finished', now(), now(), ${order.length - i}, 0)
-      on conflict (participant_id, attempt_number) do nothing`;
+      insert into attempts (participant_id, event_key, status, started_at, finished_at, score, duration_ms)
+      values (${order[i].id}, 'random_order', 'finished', now(), now(), ${order.length - i}, 0)
+      on conflict (participant_id, event_key, attempt_number) do nothing`;
   }
   await tx`
     update competitions set config = config || '{"order_generated": true}'::jsonb
@@ -164,20 +277,21 @@ export async function participantBySession(competitionId: string, sessionToken: 
   return rows[0] ?? null;
 }
 
-export async function currentAttempt(participantId: string) {
+export async function currentAttempt(participantId: string, eventKey: string) {
   const rows = await sql`
-    select * from attempts where participant_id = ${participantId}
+    select * from attempts
+    where participant_id = ${participantId} and event_key = ${eventKey}
     order by attempt_number desc limit 1`;
   return rows[0] ?? null;
 }
 
-export async function startAttempt(comp: any, participant: any) {
-  const existing = await currentAttempt(participant.id);
-  if (existing) return existing; // one attempt: resume or show result, never restart
+export async function startAttempt(comp: any, participant: any, eventKey: string) {
+  const existing = await currentAttempt(participant.id, eventKey);
+  if (existing) return existing; // one attempt per event: resume, never restart
   const cfg = comp.config ?? {};
   let state: any;
   let limitSec: number;
-  if (comp.type === "trex") {
+  if (eventKey === "trex") {
     // One session: practice runs + the real run, against a session clock.
     state = { runs: [] };
     limitSec = cfg.session_limit_seconds ?? 900;
@@ -193,14 +307,14 @@ export async function startAttempt(comp: any, participant: any) {
     state = { question_order: order, option_orders: optionOrders, answers: {}, current_index: 0 };
   }
   const rows = await sql`
-    insert into attempts (participant_id, started_at, deadline_at, state)
-    values (${participant.id}, now(), now() + make_interval(secs => ${limitSec}), ${sql.json(state)})
-    on conflict (participant_id, attempt_number) do nothing
+    insert into attempts (participant_id, event_key, started_at, deadline_at, state)
+    values (${participant.id}, ${eventKey}, now(), now() + make_interval(secs => ${limitSec}), ${sql.json(state)})
+    on conflict (participant_id, event_key, attempt_number) do nothing
     returning *`;
   if (rows[0]) {
-    await logEvent("attempt_started", { competitionId: comp.id, participantId: participant.id });
+    await logEvent("attempt_started", { competitionId: comp.id, participantId: participant.id, props: { event: eventKey } });
   }
-  return rows[0] ?? await currentAttempt(participant.id);
+  return rows[0] ?? await currentAttempt(participant.id, eventKey);
 }
 
 // The run that counts is the one after the practice runs.
@@ -209,7 +323,8 @@ export function realRunIndex(comp: any): number {
 }
 
 async function scoreAttempt(attempt: any, comp: any): Promise<number> {
-  if (comp.type === "trex") {
+  const key = attempt.event_key ?? comp.type;
+  if (key === "trex") {
     const runs = attemptState(attempt).runs ?? [];
     const real = runs[realRunIndex(comp)];
     return real ? Number(real.score) || 0 : 0;
@@ -310,6 +425,52 @@ export async function submitRun(comp: any, attempt: any, rawScore: number) {
   return { done: false, attempt: updated };
 }
 
+// ---------- answer key (paid, per-seat) ----------
+
+export async function participantKeyEntitled(participantId: string): Promise<boolean> {
+  const rows = await sql`
+    select 1 from entitlements
+    where granted_to_participant_id = ${participantId} and sku = 'answer_key'`;
+  return rows.length > 0;
+}
+
+// The full key for one buyer: their own sheet question by question, plus what
+// every other FINISHED member missed. Members who haven't finished the test
+// are simply absent — they have no answers yet.
+export async function buildAnswerKey(comp: any, buyer: any) {
+  const bank = await bankQuestions(comp.config?.bank_version ?? 1);
+  const own = await currentAttempt(buyer.id, "wonderlic");
+  const ownAnswers = own ? (attemptState(own).answers ?? {}) : {};
+  const yours = bank.map((q: any) => {
+    const pick = ownAnswers[q.id];
+    return {
+      prompt: q.prompt,
+      correct: q.options[q.correct_index],
+      your_answer: pick === null || pick === undefined ? null : q.options[pick],
+      got_it: pick === q.correct_index,
+      explanation: q.explanation,
+    };
+  });
+  const others = await sql`
+    select p.id, p.display_name, p.real_name, a.score, a.state from attempts a
+    join participants p on p.id = a.participant_id
+    where p.competition_id = ${comp.id} and a.event_key = 'wonderlic'
+      and a.status = 'finished' and p.id != ${buyer.id}
+    order by a.score desc, a.duration_ms asc`;
+  const members = others.map((m: any) => {
+    const answers = attemptState(m).answers ?? {};
+    const missed = bank
+      .filter((q: any) => answers[q.id] !== q.correct_index)
+      .map((q: any) => ({
+        prompt: q.prompt,
+        their_answer: answers[q.id] === null || answers[q.id] === undefined ? null : q.options[answers[q.id]],
+        correct: q.options[q.correct_index],
+      }));
+    return { name: m.display_name, real_name: m.real_name, score: Number(m.score), missed };
+  });
+  return { yours, members };
+}
+
 // ---------- admin close ----------
 
 export async function closeCompetition(competitionId: string) {
@@ -317,20 +478,18 @@ export async function closeCompetition(competitionId: string) {
     const [comp] = await tx`select * from competitions where id = ${competitionId} for update`;
     if (!comp || comp.status === "closed") return;
 
-    if (comp.type === "wonderlic" || comp.type === "trex") {
-      // Finalize anyone mid-attempt with what they have so far.
+    if (comp.type !== "random_order") {
+      // Finalize anyone mid-attempt with what they have so far (per event).
       const inProgress = await tx`
         select a.*, p.competition_id from attempts a
         join participants p on p.id = a.participant_id
         where p.competition_id = ${competitionId} and a.status = 'in_progress'`;
-      const questions = comp.type === "wonderlic"
-        ? await tx`
-            select id, correct_index from questions
-            where bank_version = ${comp.config?.bank_version ?? 1}`
-        : [];
+      const questions = await tx`
+        select id, correct_index from questions
+        where bank_version = ${comp.config?.bank_version ?? 1}`;
       for (const a of inProgress) {
         let score = 0;
-        if (comp.type === "trex") {
+        if (a.event_key === "trex") {
           const real = (attemptState(a).runs ?? [])[realRunIndex(comp)];
           score = real ? Number(real.score) || 0 : 0;
         } else {

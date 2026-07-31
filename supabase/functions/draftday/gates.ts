@@ -59,12 +59,11 @@ function fnv1a(s: string): number {
   return h >>> 0;
 }
 
-export async function hasEntitlement(adminId: string, product = "pro"): Promise<boolean> {
+export async function hasEntitlement(adminId: string, sku = "ultimate"): Promise<boolean> {
   if (!adminId) return false;
   const rows = await sql`
     select 1 from entitlements
-    where admin_id = ${adminId} and product = ${product}
-      and (expires_at is null or expires_at > now())`;
+    where admin_id = ${adminId} and sku = ${sku}`;
   return rows.length > 0;
 }
 

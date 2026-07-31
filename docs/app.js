@@ -9,7 +9,10 @@ let landingWired = false;
 
 /* Display names only — the enum values in the DB/API are unchanged. */
 const TYPE_NAME = (t) =>
-  t === "wonderlic" ? "Draft Day Aptitude Test" : t === "trex" ? "T-Rex Runner" : "Random Order";
+  t === "wonderlic" ? "Draft Day Aptitude Test"
+  : t === "trex" ? "The Dash"
+  : t === "combine" ? "Skill & Wit Combine"
+  : "Random Order";
 
 /* Group-chat messages. Shared by the landing preview and the live share card. */
 const MSGS_TEST = [
@@ -23,9 +26,14 @@ const MSGS_DRAW = [
   "draft order draw is happening on this link. lock your name in, order gets drawn once everyone's in, everybody sees it live. ten seconds"
 ];
 const MSGS_TREX = [
-  "Yooooo\n\ndraft order this year = the dinosaur game. yes, that one\n\neveryone gets 3 practice runs then 1 run that counts. highest score picks first, last place lives with it\n\ntakes five minutes on your phone, link below",
-  "new rule for this year\n\nno hat, no randomizer. draft order is decided by the dino runner\n\n3 practice runs, then 1 real one. highest score picks first, last place picks last\n\nwarm up first. you'll need it",
-  "draft order = dino game this year. 3 practice runs, 1 that counts, highest score picks first. five minutes on your phone, link below"
+  "Yooooo\n\ndraft order this year = The Dash. run, jump, don't crash\n\neveryone gets 3 practice runs then 1 run that counts. highest score picks first, last place lives with it\n\ntakes five minutes on your phone, link below",
+  "new rule for this year\n\nno hat, no randomizer. draft order is decided by The Dash\n\n3 practice runs, then 1 real one. highest score picks first, last place picks last\n\nwarm up first. you'll need it",
+  "draft order = The Dash this year. 3 practice runs, 1 that counts, highest score picks first. five minutes on your phone, link below"
+];
+const MSGS_COMBINE = [
+  "Yooooo\n\ndraft order this year is a full COMBINE. two events\n\nevent 1: a 6 minute test. event 2: The Dash. your positions in both get averaged \u2014 best combined finish picks first\n\nno hiding behind one skill. link below",
+  "new rule for this year\n\ntwo events, one draft order. the 6 minute test, then The Dash. positions averaged, lowest combined rank picks first\n\nyou need wits AND thumbs. no re-rolls",
+  "draft order = a two-event combine. test + The Dash, positions averaged, best combined finish picks first. link below"
 ];
 const wrap = () => document.getElementById("wrap");
 const $ = (s, el) => (el || document).querySelector(s);
@@ -51,7 +59,8 @@ function lbRowsHtml(rows, showScore) {
   return rows.map((r) =>
     '<div class="lb-row' + (r.rank === 1 ? " top" : "") + '"><span class="rk">' + r.rank + "</span>" +
     '<span class="nm">' + esc(r.name) +
-      (r.real_name ? '<span class="rn">' + esc(r.real_name) + "</span>" : "") + "</span>" +
+      (r.real_name ? '<span class="rn">' + esc(r.real_name) + "</span>" : "") +
+      (r.event_ranks ? '<span class="rn">Test #' + r.event_ranks.wonderlic + " \u00b7 Dash #" + r.event_ranks.trex + " \u2192 avg " + r.score + "</span>" : "") + "</span>" +
     (showScore && r.score != null
       ? '<span class="sc">' + r.score + '</span><span class="tm">' + fmtDur(r.duration_ms) + "</span>"
       : "") +
@@ -61,38 +70,130 @@ function lbRowsHtml(rows, showScore) {
 
 /* Generic paywall modal — driven entirely by server-supplied copy so
    experiments can change messaging without a frontend deploy. */
-function showPaywall(p) {
+function showPaywall(p, opts) {
+  opts = opts || {};
   const bg = document.createElement("div");
   bg.className = "modal-bg open";
+  const feats = (opts.features || []).map((f) =>
+    '<div class="feat">' + f.icon +
+    '<div class="feat-t"><b>' + f.title + "</b><div class=\"mut\">" + f.sub + "</div>" +
+    (f.note ? '<div class="feat-note">' + f.note + "</div>" : "") + "</div></div>").join("");
   bg.innerHTML =
-    '<div class="modal"><div class="kicker">Premium</div>' +
+    '<div class="modal"><div class="kicker">' + (opts.kicker || "Premium") + "</div>" +
     "<h2>" + esc(p.title) + "</h2>" +
-    '<div class="mut" style="margin-top:8px">' + esc(p.message) + "</div>" +
-    '<button class="btn" disabled title="Payments coming soon">' + esc(p.cta) + "</button>" +
-    '<div class="mut center" style="margin-top:8px;font-size:12px">Payments aren&#39;t live yet.</div>' +
-    '<button class="btn ghost" id="pwClose">Not now</button></div>';
+    (p.message ? '<div class="mut" style="margin-top:8px">' + esc(p.message) + "</div>" : "") +
+    feats +
+    (opts.onPurchase
+      ? '<button class="btn" id="pwBuy">' + esc(p.cta) + "</button>" +
+        '<div class="mut center" style="margin-top:8px;font-size:12px">Mock checkout &mdash; payments aren&#39;t live yet.</div>'
+      : '<button class="btn" disabled title="Payments coming soon">' + esc(p.cta) + "</button>" +
+        '<div class="mut center" style="margin-top:8px;font-size:12px">Payments aren&#39;t live yet.</div>') +
+    '<button class="btn ghost" id="pwClose">' + (opts.secondaryLabel || "Not now") + "</button></div>";
   document.body.appendChild(bg);
-  bg.querySelector("#pwClose").onclick = () => bg.remove();
+  const close = () => bg.remove();
+  bg.querySelector("#pwClose").onclick = () => { close(); if (opts.onSkip) opts.onSkip(); };
+  const buy = bg.querySelector("#pwBuy");
+  if (buy) buy.onclick = async () => {
+    buy.disabled = true; buy.textContent = "Unlocking\u2026";
+    try { await opts.onPurchase(); close(); }
+    catch { buy.disabled = false; buy.textContent = p.cta; }
+  };
+  return close;
+}
+
+/* ---- Ultimate upsell: three features, three custom icons ---- */
+const ULT_ICONS = {
+  players:
+    '<svg class="feat-ic" viewBox="0 0 44 44" fill="none">' +
+    '<circle cx="14" cy="15" r="5.5" fill="#4DA3FF"/><path d="M5 33c0-5.5 4-9 9-9s9 3.5 9 9" fill="#4DA3FF" opacity=".85"/>' +
+    '<circle cx="30" cy="13" r="5" fill="#FFB01F"/><path d="M22 30c0-5 3.6-8 8-8s8 3 8 8" fill="#FFB01F" opacity=".85"/>' +
+    '<circle cx="22" cy="20" r="6" fill="#C9A44C"/><path d="M12 38c0-6 4.5-10 10-10s10 4 10 10" fill="#C9A44C"/>' +
+    '<path d="M36 6v6M33 9h6" stroke="#3DDC84" stroke-width="2.4" stroke-linecap="round"/></svg>',
+  key:
+    '<svg class="feat-ic" viewBox="0 0 44 44" fill="none">' +
+    '<rect x="6" y="6" width="22" height="28" rx="3" fill="#EDEFF5"/>' +
+    '<path d="M10 13h9M10 19h14M10 25h11" stroke="#8B94A9" stroke-width="2" stroke-linecap="round"/>' +
+    '<path d="M11 30l2.5 2.5L18 28" stroke="#3DDC84" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<circle cx="31" cy="26" r="6.5" fill="none" stroke="#C9A44C" stroke-width="3.4"/>' +
+    '<path d="M35.5 30.5L41 36M38 33l3-3M35 36l3-3" stroke="#C9A44C" stroke-width="3" stroke-linecap="round"/></svg>',
+  combine:
+    '<svg class="feat-ic" viewBox="0 0 44 44" fill="none">' +
+    '<rect x="4" y="24" width="10" height="14" rx="1.5" fill="#C9A44C"/>' +
+    '<rect x="17" y="16" width="10" height="22" rx="1.5" fill="#FFB01F"/>' +
+    '<rect x="30" y="28" width="10" height="10" rx="1.5" fill="#A78BFA"/>' +
+    '<path d="M17 8c2.5 0 2.5 3 5 3s2.5-3 5-3" stroke="#4DA3FF" stroke-width="2.4" stroke-linecap="round"/>' +
+    '<path d="M24 4l-4 7h3.4l-2.4 6 5.6-8h-3.4l2-5h-1.2z" fill="#FFB01F" stroke="#FFB01F" stroke-width=".6"/></svg>',
+};
+
+function openUltimateModal(price, onPurchase, onSkip) {
+  return showPaywall(
+    {
+      title: "Unlock Ultimate",
+      message: "One purchase covers your whole account, every competition you run.",
+      cta: "Unlock Ultimate \u2014 $" + price,
+    },
+    {
+      kicker: "The Combine \u00b7 Ultimate",
+      onPurchase,
+      onSkip,
+      features: [
+        { icon: ULT_ICONS.players, title: "Unlimited players",
+          sub: "Free tier caps at 12. Go as big as your league needs." },
+        { icon: ULT_ICONS.key, title: "The answer key",
+          sub: "Every answer in your competition, yours and everyone else&#39;s, question by question. Included for you as the organizer &mdash; share with the league and expose people as you wish.",
+          note: "Covers your access. Members buy their own." },
+        { icon: ULT_ICONS.combine, title: "The Skill and Wit Combine",
+          sub: "Both events, one draft order. Aptitude test plus the runner, positions averaged. A true combine &mdash; test of wits and skill." },
+      ],
+    });
 }
 
 function missedCardHtml(S) {
-  if (S.missed_locked && S.missed_paywall) {
-    const p = S.missed_paywall;
-    return '<div class="card" style="text-align:left"><h2>' + esc(p.title) + "</h2>" +
-      '<div class="sub">' + esc(p.message) + "</div>" +
-      '<button class="btn ghost" disabled title="Payments coming soon">' + esc(p.cta) + "</button></div>";
+  // Full key: the buyer's own sheet plus every finished member's misses.
+  if (S.answer_key) {
+    const k = S.answer_key;
+    const own =
+      '<div class="card" style="text-align:left"><h2>The Answer Key</h2>' +
+      '<div class="mut" style="margin-top:4px">Your sheet, question by question.</div>' +
+      k.yours.map((q, i) =>
+        '<div class="miss"><div class="miss-q">' + (i + 1) + ". " + esc(q.prompt) + "</div>" +
+        (q.got_it
+          ? '<div class="miss-c">You got it: ' + esc(q.correct) + "</div>"
+          : '<div class="miss-a">Your answer: ' + (q.your_answer != null ? esc(q.your_answer) : "no answer") + "</div>" +
+            '<div class="miss-c">Correct: ' + esc(q.correct) + "</div>") +
+        (q.explanation ? '<div class="miss-x">' + esc(q.explanation) + "</div>" : "") +
+        "</div>").join("") +
+      "</div>";
+    const league =
+      '<div class="card" style="text-align:left"><h2>The league&#39;s sheets</h2>' +
+      '<div class="mut" style="margin-top:4px">What every finished player missed. Anyone still playing isn&#39;t here yet.</div>' +
+      (k.members.length
+        ? k.members.map((m) =>
+            '<details class="ksheet"><summary><b>' + esc(m.name) + "</b> &mdash; " + m.score + "/30 &middot; missed " + m.missed.length + "</summary>" +
+            (m.missed.length
+              ? m.missed.map((q) =>
+                  '<div class="miss"><div class="miss-q">' + esc(q.prompt) + "</div>" +
+                  '<div class="miss-a">Their answer: ' + (q.their_answer != null ? esc(q.their_answer) : "no answer") + "</div>" +
+                  '<div class="miss-c">Correct: ' + esc(q.correct) + "</div></div>").join("")
+              : '<div class="mut" style="padding:8px 0">Perfect sheet. Annoying.</div>') +
+            "</details>").join("")
+        : '<div class="mut" style="margin-top:10px">Nobody else has finished yet &mdash; their sheets appear here the moment they do.</div>') +
+      "</div>";
+    return own + league;
   }
-  if (!S.result || !S.missed) return "";
-  if (!S.missed.length) {
-    return '<div class="card" style="text-align:left"><h2>Perfect sheet</h2><div class="sub">You missed nothing.</div></div>';
+  // Finished but not purchased: the social-curiosity upsell.
+  if (S.key_locked) {
+    return '<div class="card" style="text-align:left"><h2>See everyone&#39;s answers</h2>' +
+      '<div class="sub">Every question you missed, and every question they missed. Find out who actually knew what.</div>' +
+      '<button class="btn" data-buykey="1">Unlock the answer key &mdash; $' + (S.key_price ?? 5) + "</button>" +
+      '<div class="mut center" style="margin-top:8px;font-size:12px">Mock checkout &mdash; yours the moment you tap. Covers your access only.</div></div>';
   }
-  return '<div class="card" style="text-align:left"><h2>What you missed</h2>' +
-    '<div class="mut" style="margin-top:4px">' + S.missed.length + " question" + (S.missed.length === 1 ? "" : "s") + " &mdash; only you can see this.</div>" +
-    S.missed.map((m) =>
-      '<div class="miss"><div class="miss-q">' + esc(m.prompt) + "</div>" +
-      '<div class="miss-a">Your answer: ' + (m.your_answer != null ? esc(m.your_answer) : "no answer (time ran out)") + "</div>" +
-      '<div class="miss-c">Correct answer: ' + esc(m.correct_answer) + "</div></div>"
-    ).join("") + "</div>";
+  // Hasn't finished: locked, with the reason.
+  if (S.key_teaser) {
+    return '<div class="card" style="text-align:left"><h2>&#128274; The answer key</h2>' +
+      '<div class="sub">Locked until you finish &mdash; only players with a completed test can unlock everyone&#39;s answers.</div></div>';
+  }
+  return "";
 }
 
 /* Viral CTA: invited members can spin up their own league. Tracks the click
@@ -174,7 +275,8 @@ function renderReveal(el, standings, opts) {
       '<div class="slot' + (r.rank === 1 ? " first" : "") + (r.dnf ? " dnf" : "") + '" data-rank="' + r.rank + '">' +
         '<div class="rank">' + r.rank + "</div>" +
         '<div class="who"><div class="nm">' + esc(r.name) + "</div>" +
-        '<div class="meta">' + (r.dnf ? "DNF" : r.rank === 1 ? "First overall pick" : "Pick " + r.rank) + "</div></div>" +
+        '<div class="meta">' + (r.dnf ? "DNF" : r.rank === 1 ? "First overall pick" : "Pick " + r.rank) +
+          (r.event_ranks ? " \u00b7 Test #" + r.event_ranks.wonderlic + " \u00b7 Dash #" + r.event_ranks.trex + " \u00b7 avg " + r.score : "") + "</div></div>" +
         (showScore && !r.dnf
           ? '<div class="pts"><div class="s">' + r.score + '</div><div class="t">' + fmtDur(r.duration_ms) + "</div></div>"
           : "") +
@@ -208,6 +310,8 @@ function memberView(TOKEN) {
 
   const api = async (path, body) => {
     const headers = { "x-pt": localStorage.getItem(ptKey) || "" };
+    const adm = localStorage.getItem("adm");
+    if (adm) headers.authorization = "Bearer " + adm; // organizer's included key access
     if (body !== undefined) headers["content-type"] = "application/json";
     const r = await fetch(API + "/c/" + TOKEN + path, body !== undefined
       ? { method: "POST", headers, body: JSON.stringify(body) }
@@ -271,7 +375,7 @@ function memberView(TOKEN) {
     clearTimers();
     const q = Q[localIdx];
     app().innerHTML =
-      '<div style="text-align:left"><div class="testbar"><span class="qcount">Q ' + (localIdx + 1) + "/" + total + '</span><span class="clock" id="clock">--:--</span></div>' +
+      '<div style="text-align:left"><div class="testbar"><span class="qcount">' + (S.event && S.event.total > 1 ? "E" + (S.event.index + 1) + "/" + S.event.total + " \u00b7 " : "") + "Q " + (localIdx + 1) + "/" + total + '</span><span class="clock" id="clock">--:--</span></div>' +
       '<div class="qprompt" id="qp">' + esc(q.prompt) + "</div>" +
       '<div class="opts" id="opts">' +
       q.options.map((o, i) =>
@@ -317,8 +421,12 @@ function memberView(TOKEN) {
   function gameHeader() {
     const runIdx = S.run_index;
     const isReal = runIdx >= S.practice_runs;
-    return '<div class="row spread" style="margin-top:10px"><span class="tag' + (isReal ? " red" : "") + '">' +
-      (isReal ? "The real run" : "Practice " + (runIdx + 1) + " of " + S.practice_runs) + "</span>" +
+    const evTag = S.event && S.event.total > 1
+      ? '<span class="tag gray" style="margin-right:6px">Event ' + (S.event.index + 1) + " of " + S.event.total + "</span>"
+      : "";
+    return '<div class="row spread" style="margin-top:10px"><span>' + evTag +
+      '<span class="tag' + (isReal ? " red" : "") + '">' +
+      (isReal ? "The real run" : "Practice " + (runIdx + 1) + " of " + S.practice_runs) + "</span></span>" +
       '<span class="mut"><span id="clock" class="clock sm">--:--</span> session left</span></div>';
   }
 
@@ -368,7 +476,7 @@ function memberView(TOKEN) {
     lastPhase = "game";
     app().innerHTML =
       '<div class="game-screen" style="text-align:left"><div><div class="kicker">' + esc(S.league.name) + '</div>' +
-      '<h1 style="font-size:30px">T-Rex Run-Off</h1>' +
+      '<h1 style="font-size:30px">The Dash</h1>' +
       '<div id="gameHead">' + gameHeader() + "</div></div>" +
       '<div class="trex-stage"><div id="trexCont"></div></div>' +
       '<div class="card"><div class="sub" id="runMsg">Loading the game&hellip;</div>' +
@@ -396,6 +504,30 @@ function memberView(TOKEN) {
       if (window.__dino && window.__dino.stopListening) { try { window.__dino.stopListening(); } catch (e) {} }
       Runner.instance_ = null;
       dino = window.__dino = new Runner("#trexCont");
+      // "The Dash": replace Google's dinosaur with a generic runner character.
+      const proto = Object.getPrototypeOf(dino.tRex);
+      if (!proto.__dashSkin) {
+        proto.__dashSkin = true;
+        proto.draw = function () {
+          const ctx = this.canvasCtx;
+          const duck = this.ducking;
+          const w = duck ? 52 : 34, h = duck ? 20 : 40;
+          const x = this.xPos + 2, y = this.yPos + (duck ? 22 : 3);
+          ctx.save();
+          ctx.fillStyle = "#1E2942";
+          if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(x, y, w, h, 7); ctx.fill(); }
+          else ctx.fillRect(x, y, w, h);
+          ctx.fillStyle = "#FFB01F"; // visor, facing the obstacles
+          ctx.fillRect(x + w - 12, y + (duck ? 5 : 7), 9, 5);
+          if (!duck) {
+            const step = Math.floor(Date.now() / 90) % 2;
+            ctx.fillStyle = "#1E2942";
+            ctx.fillRect(x + 4 + (step ? 5 : 0), y + h, 7, 4);
+            ctx.fillRect(x + w - 12 - (step ? 5 : 0), y + h, 7, 4);
+          }
+          ctx.restore();
+        };
+      }
       armCrash();
       const isReal = S.run_index >= S.practice_runs;
       $("#runMsg").innerHTML = isReal
@@ -416,6 +548,25 @@ function memberView(TOKEN) {
     const L = S.league;
     const isW = S.type === "wonderlic";
     const isT = S.type === "trex";
+    const isC = S.type === "combine";
+
+    // Combine: between events. Event 1 is done, event 2 hasn't started.
+    if (S.phase === "ready" && S.event && S.event.index > 0) {
+      const ev1 = (S.completed_events && S.completed_events[0]) || {};
+      app().innerHTML =
+        '<div class="fade-in" style="text-align:left"><div class="kicker">' + esc(L.name) + "</div>" +
+        "<h1>Event 1<br>Complete</h1>" +
+        '<div class="card center"><div class="mut">Your test score</div>' +
+        '<div class="bignum">' + (ev1.score ?? "&mdash;") + '<span style="color:var(--dim);font-size:40px">/30</span></div></div>' +
+        '<div class="card"><div class="row spread"><span class="tag red">Event 2 of 2</span><span class="mut">The Dash</span></div>' +
+        '<div class="warnbox"><b>One sitting:</b> pressing start opens your Dash session &mdash; 3 practice runs, then the run that counts, with a 15:00 session limit.</div>' +
+        '<button class="btn" id="goBtn">Start event 2</button></div></div>';
+      $("#goBtn").onclick = async () => {
+        $("#goBtn").disabled = true;
+        try { setState(await api("/start", {})); } catch { const b = $("#goBtn"); if (b) b.disabled = false; }
+      };
+      return;
+    }
 
     if (S.phase === "join" || S.phase === "ready") {
       // Preserve any half-typed names across re-renders (e.g. visibility refresh).
@@ -434,13 +585,29 @@ function memberView(TOKEN) {
             '<div class="rule"><span class="ico">&#9670;</span><span>Jump the cacti &mdash; survive longer, <span class="gold">score higher</span></span></div>' +
             '<div class="rule"><span class="ico">&#9670;</span><span>Highest score gets to choose their <span class="gold">preferred draft slot</span></span></div>' +
           "</div>"
+        : isC
+        ? '<div class="rules">' +
+            '<div class="rule"><span class="ico">&#9670;</span><span><span class="gold">Event 1:</span> the aptitude test &mdash; 30 questions, 6:00</span></div>' +
+            '<div class="rule"><span class="ico">&#9670;</span><span><span class="gold">Event 2:</span> The Dash &mdash; 3 practice runs, 1 that counts</span></div>' +
+            '<div class="rule"><span class="ico">&#9670;</span><span>Positions averaged &mdash; <span class="gold">lowest combined rank</span> picks first</span></div>' +
+          "</div>"
         : '<div class="rules">' +
             '<div class="rule"><span class="ico">&#9670;</span><span>All <span class="gold">' + L.member_count + ' names</span> go into the draw</span></div>' +
             '<div class="rule"><span class="ico">&#9670;</span><span>The order is drawn the moment the <span class="gold">last member locks in</span></span></div>' +
           "</div>";
 
       let lbCard = "";
-      if (isW || isT) {
+      if (S.roster_combine) {
+        lbCard =
+          '<div class="card"><div class="row spread"><h2>Progress</h2>' +
+          '<span class="mut">' + S.finished + " of " + L.member_count + " done</span></div>" +
+          (S.roster_combine.length
+            ? S.roster_combine.map((m) =>
+                '<div class="lb-row"><span class="rk">' + (m.done >= m.total ? "&#10003;" : m.done + "/" + m.total) + "</span>" +
+                '<span class="nm">' + esc(m.name) + (m.real_name ? '<span class="rn">' + esc(m.real_name) + "</span>" : "") + "</span></div>").join("")
+            : '<div class="mut" style="margin-top:10px">Nobody yet &mdash; be first on the board.</div>') +
+          "</div>";
+      } else if (isW || isT) {
         const lb = S.leaderboard || [];
         lbCard =
           '<div class="card"><div class="row spread"><h2>Leaderboard</h2>' +
@@ -462,10 +629,10 @@ function memberView(TOKEN) {
 
       app().innerHTML =
         '<div class="fade-in" style="text-align:left"><div class="kicker">' + esc(L.name) + '</div>' +
-        "<h1>" + (isW ? "Draft Order<br>Cognitive Test" : isT ? "T-Rex<br>Run-Off" : "Random<br>Draft Order") + "</h1>" +
+        "<h1>" + (isW ? "Draft Order<br>Cognitive Test" : isT ? "The<br>Dash" : isC ? "Skill &amp; Wit<br>Combine" : "Random<br>Draft Order") + "</h1>" +
         rules +
         '<div class="card">' +
-          '<div class="row spread"><span class="tag">' + (isW ? "Timed Test" : isT ? "Game of Skill" : "Random Draw") + "</span></div>" +
+          '<div class="row spread"><span class="tag">' + (isW ? "Timed Test" : isT ? "Game of Skill" : isC ? "Two Events" : "Random Draw") + "</span></div>" +
           (S.phase === "join"
             ? '<label for="nm">Display name</label><input id="nm" type="text" maxlength="40" placeholder="e.g. Big Mike" autocomplete="off">' +
               '<label for="rn">Your actual name</label><input id="rn" type="text" maxlength="60" placeholder="So the commissioner knows it&#39;s you" autocomplete="name">'
@@ -474,8 +641,10 @@ function memberView(TOKEN) {
             ? '<div class="warnbox"><b>Heads up:</b> the 6:00 timer starts the instant you press the button below. It cannot be paused &mdash; closing the app, losing signal, or switching tabs will NOT stop it. One attempt only.</div>'
             : isT
             ? '<div class="warnbox"><b>One sitting:</b> pressing the button starts your session &mdash; 3 practice runs, then the real one, back-to-back with a 15:00 session limit. One attempt only.</div>'
+            : isC
+            ? '<div class="warnbox"><b>Heads up:</b> event 1 is the 6:00 test &mdash; its timer starts the instant you press the button and cannot be paused. The Dash follows as event 2. One attempt per event.</div>'
             : "") +
-          '<button class="btn" id="goBtn">' + (isW ? "Start the test" : isT ? "Start playing" : "Lock me in") + "</button>" +
+          '<button class="btn" id="goBtn">' + (isW ? "Start the test" : isT ? "Start playing" : isC ? "Start event 1" : "Lock me in") + "</button>" +
           '<div class="err" id="joinErr"></div>' +
         "</div>" +
         lbCard + "</div>";
@@ -495,7 +664,7 @@ function memberView(TOKEN) {
             if (j.error) { $("#joinErr").textContent = j.error; return; }
             if (j.participant_token) localStorage.setItem(ptKey, j.participant_token);
           }
-          setState(isW || isT ? await api("/start", {}) : await api("/state.json"));
+          setState(isW || isT || isC ? await api("/start", {}) : await api("/state.json"));
         } finally { busy = false; const b = $("#goBtn"); if (b) b.disabled = false; }
       };
       if (nm) nm.addEventListener("keydown", (e) => { if (e.key === "Enter" && rn) rn.focus(); });
@@ -525,21 +694,34 @@ function memberView(TOKEN) {
 
     if (S.phase === "done") {
       const lb = S.leaderboard || [];
+      const scoreCard = S.result.events
+        ? '<div class="card"><div class="mut">Your combine</div>' +
+          '<div class="row" style="justify-content:center;gap:30px;margin-top:10px">' +
+          S.result.events.map((e) =>
+            '<div class="center"><div class="bignum" style="font-size:54px">' + e.score + "</div>" +
+            '<div class="mut">' + (e.key === "wonderlic" ? "Test /30" : "The Dash") + "</div></div>").join("") +
+          '</div><div class="sub">both events complete</div></div>'
+        : '<div class="card"><div class="mut">Your score</div>' +
+          '<div class="bignum">' + S.result.score + (S.result.total ? '<span style="color:var(--dim);font-size:40px">/' + S.result.total + "</span>" : "") + "</div>" +
+          '<div class="sub">in ' + fmtDur(S.result.duration_ms) + "</div></div>";
       app().innerHTML =
         '<div class="fade-in center"><div class="kicker">' + esc(L.name) + '</div>' +
-        "<h1>" + (S.timed_out ? "Time!" : "Test complete") + "</h1>" +
-        '<div class="card"><div class="mut">Your score</div>' +
-        '<div class="bignum">' + S.result.score + (S.result.total ? '<span style="color:var(--dim);font-size:40px">/' + S.result.total + "</span>" : "") + "</div>" +
-        '<div class="sub">in ' + fmtDur(S.result.duration_ms) + "</div></div>" +
+        "<h1>" + (S.result.events ? "Combine complete" : S.timed_out ? "Time!" : "Test complete") + "</h1>" +
+        scoreCard +
         missedCardHtml(S) +
         ctaCardHtml() +
-        '<div class="card" style="text-align:left"><div class="row spread"><h2>Leaderboard</h2>' +
+        '<div class="card" style="text-align:left"><div class="row spread"><h2>' + (S.roster_combine ? "Progress" : "Leaderboard") + "</h2>" +
         '<span class="mut" id="lbCount">' + S.finished + " of " + L.member_count + ' finished</span></div>' +
         '<div id="lbWrap">' +
-        (lb.length ? lbRowsHtml(lb, true) : '<div class="mut" style="margin-top:10px">No other scores yet.</div>') +
+        (S.roster_combine
+          ? S.roster_combine.map((m) =>
+              '<div class="lb-row"><span class="rk">' + (m.done >= m.total ? "&#10003;" : m.done + "/" + m.total) + "</span>" +
+              '<span class="nm">' + esc(m.name) + (m.real_name ? '<span class="rn">' + esc(m.real_name) + "</span>" : "") + "</span></div>").join("")
+          : lb.length ? lbRowsHtml(lb, true) : '<div class="mut" style="margin-top:10px">No other scores yet.</div>') +
         "</div>" +
         '<div class="mut" style="margin-top:12px">The full draft order reveal unlocks when everyone is done.</div></div></div>';
       wireCta(TOKEN);
+      wireKeyBuy();
       schedulePoll(5000);
       return;
     }
@@ -550,12 +732,32 @@ function memberView(TOKEN) {
         "<h1>The results are in</h1>" +
         (S.result ? '<div class="sub">You scored ' + S.result.score + (S.result.total ? "/" + S.result.total : "") + " in " + fmtDur(S.result.duration_ms) + ".</div>" : "") +
         '<div id="reveal"></div>' + missedCardHtml(S) + ctaCardHtml(true) + "</div>";
-      renderReveal($("#reveal"), S.standings, { showScore: S.type === "wonderlic", shareUrl: S.results_url });
+      renderReveal($("#reveal"), S.standings, { showScore: S.type !== "random_order", shareUrl: S.results_url });
       wireCta(TOKEN);
+      wireKeyBuy();
       return;
     }
 
     app().innerHTML = '<div class="card">' + esc(S.error || "Competition unavailable.") + "</div>";
+  }
+
+  function wireKeyBuy() {
+    const b = document.querySelector("[data-buykey]");
+    if (!b) return;
+    b.onclick = async () => {
+      b.disabled = true;
+      const label = b.textContent;
+      b.textContent = "Unlocking\u2026";
+      try {
+        const r = await fetch(API + "/api/entitlements/grant", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-pt": localStorage.getItem(ptKey) || "" },
+          body: JSON.stringify({ sku: "answer_key", competition_id: S.competition_id }),
+        }).then((x) => x.json());
+        if (r.error) { b.disabled = false; b.textContent = label; alert(r.error); return; }
+        refresh(); // delivery is immediate: next state carries the full key
+      } catch { b.disabled = false; b.textContent = label; }
+    };
   }
 
   document.addEventListener("visibilitychange", () => { if (!document.hidden && location.hash.includes(TOKEN)) refresh(); });
@@ -674,7 +876,8 @@ async function adminHome() {
       <label>Game type</label>
       <select id="ctype">
         <option value="wonderlic">Draft Day Aptitude Test — 30 questions, 6 minutes</option>
-        <option value="trex">T-Rex Runner — game of skill</option>
+        <option value="trex">The Dash — game of skill</option>
+        <option value="combine">The Skill and Wit Combine — both events${d.entitlements && d.entitlements.ultimate ? "" : " 🔒 Ultimate"}</option>
         <option value="random_order">Random order draw</option>
       </select>
       <label>League name</label><input type="text" id="lname" maxlength="60" placeholder="e.g. The Sunday Regrets">
@@ -683,12 +886,39 @@ async function adminHome() {
       <button class="btn" id="lcreate">Create competition</button>
     </div></div>`;
   $("#logoutBtn").onclick = () => { localStorage.removeItem("adm"); renderLogin(); };
-  $("#lcreate").onclick = async () => {
-    const r = await aapi("/api/admin/competitions", {
+  $("#lcreate").onclick = () => {
+    const payload = {
       type: $("#ctype").value, name: $("#lname").value, member_count: Number($("#lmembers").value),
-    });
-    if (r.error) { $("#lerr").textContent = r.error; return; }
-    location.hash = "#/admin/comp/" + r.id;
+    };
+    $("#lerr").textContent = "";
+    const doCreate = async () => {
+      const r = await aapi("/api/admin/competitions", payload);
+      if (r.error) { $("#lerr").textContent = r.error; return; }
+      location.hash = "#/admin/comp/" + r.id;
+    };
+    if (d.entitlements && d.entitlements.ultimate) { doCreate(); return; }
+    // The upsell moment: every create press for free accounts. "Not now"
+    // proceeds on the free tier — unless the chosen settings need premium,
+    // in which case it returns to the form instead of creating something invalid.
+    const needsPremium = payload.member_count > 12 || payload.type === "combine";
+    openUltimateModal(
+      (d.prices && d.prices.ultimate) || 19,
+      async () => {
+        const g = await aapi("/api/entitlements/grant", { sku: "ultimate" });
+        if (g.error) { $("#lerr").textContent = g.error; return; }
+        d.entitlements = d.entitlements || {};
+        d.entitlements.ultimate = true;
+        await doCreate();
+      },
+      () => {
+        if (needsPremium) {
+          $("#lerr").textContent = payload.type === "combine"
+            ? "The Skill and Wit Combine needs Ultimate — pick another game type or unlock it."
+            : "The free tier caps at 12 players — lower the count or unlock Ultimate.";
+        } else {
+          doCreate();
+        }
+      });
   };
 }
 
@@ -712,7 +942,7 @@ async function compView(id) {
         <button class="btn" id="beginBtn">Begin competition</button>
       </div>`;
   } else {
-    const msgs = c.type === "random_order" ? MSGS_DRAW : c.type === "trex" ? MSGS_TREX : MSGS_TEST;
+    const msgs = c.type === "random_order" ? MSGS_DRAW : c.type === "trex" ? MSGS_TREX : c.type === "combine" ? MSGS_COMBINE : MSGS_TEST;
     const shareCard = shareUrl ? `
       <div class="card">
         <h2>The group chat message</h2>
@@ -753,7 +983,7 @@ async function compView(id) {
     <div class="kicker" style="margin-top:10px">${esc(c.name)}</div>
     <h1>${typeName}</h1>
     <div class="row" style="margin-top:6px"><span class="tag ${c.status === "active" ? "" : c.status === "closed" ? "red" : "gray"}">${c.status}</span>
-    <span class="mut">${c.type === "wonderlic" ? "30 questions · 6:00 · ties broken by speed" : c.type === "trex" ? "3 practice runs · 1 real run · highest score wins" : "Order drawn when all members lock in"}</span></div>
+    <span class="mut">${c.type === "wonderlic" ? "30 questions · 6:00 · ties broken by speed" : c.type === "trex" ? "3 practice runs · 1 real run · highest score wins" : c.type === "combine" ? "Two events · positions averaged · lowest combined rank wins" : "Order drawn when all members lock in"}</span></div>
     ${block}
     <div class="card">
       <h2>Competition settings</h2>
@@ -770,7 +1000,7 @@ async function compView(id) {
     };
   });
   // Tone tabs on the share-message card keep the bubble and copy payload in sync.
-  const shareMsgs = c.type === "random_order" ? MSGS_DRAW : c.type === "trex" ? MSGS_TREX : MSGS_TEST;
+  const shareMsgs = c.type === "random_order" ? MSGS_DRAW : c.type === "trex" ? MSGS_TREX : c.type === "combine" ? MSGS_COMBINE : MSGS_TEST;
   if ($("#shareBubble")) {
     document.querySelectorAll("[data-share-tone]").forEach((t) => {
       t.onclick = () => {

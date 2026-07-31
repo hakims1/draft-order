@@ -2,7 +2,12 @@ import { Hono } from "npm:hono@4.6.14";
 import sql, { randomToken } from "./db.ts";
 import { adminFromSession, createSession, destroySession, hashPassword, verifyPassword } from "./auth.ts";
 import {
+  PRICES,
+  attemptsByEvent,
   bankQuestions,
+  buildAnswerKey,
+  eventsFor,
+  participantKeyEntitled,
   closeCompetition,
   competitionByResultsToken,
   competitionByShareToken,
@@ -20,7 +25,7 @@ import {
   submitAnswer,
   submitRun,
 } from "./logic.ts";
-import { checkGate, isOwner, logEvent } from "./gates.ts";
+import { checkGate, hasEntitlement, isOwner, logEvent } from "./gates.ts";
 
 const FN = "draftday";
 // Public site (GitHub Pages). Share/results URLs are built against this.
@@ -67,55 +72,64 @@ async function sweepExpired(comp: any) {
   for (const a of expired) await finalizeAttempt(a, comp, true);
 }
 
-// Post-completion review: only the questions this member got wrong (or never
-// reached), with their pick and the correct answer. Never sent mid-test.
-async function missedQuestions(attempt: any, comp: any) {
-  const questions = await bankQuestions(comp.config?.bank_version ?? 1);
-  const qmap = new Map(questions.map((q: any) => [q.id, q]));
-  const st = attemptState(attempt);
-  const answers = st.answers ?? {};
-  const missed: any[] = [];
-  for (const qid of st.question_order ?? []) {
-    const q: any = qmap.get(qid);
-    if (!q) continue;
-    const a = answers[qid];
-    if (a === q.correct_index) continue;
-    missed.push({
-      prompt: q.prompt,
-      your_answer: a === null || a === undefined ? null : q.options[a],
-      correct_answer: q.options[q.correct_index],
-    });
-  }
-  return missed;
-}
-
 async function memberState(c: any, comp: any, light = false) {
   await sweepExpired(comp);
   const ptoken = c.req.header("x-pt") || undefined;
   const participant = await participantBySession(comp.id, ptoken);
-  const finished = await finishedCount(comp.id);
+  const finished = await finishedCount(comp);
   const [{ joined }] = await sql`
     select count(*)::int as joined from participants
     where competition_id = ${comp.id} and not is_placeholder`;
   const visible = standingsVisible(comp, finished);
   const league = { name: comp.name, member_count: comp.member_count };
   const displayCount = comp.type === "random_order" ? joined : finished;
-  const payload: any = { type: comp.type, league, finished: displayCount };
+  const events = eventsFor(comp);
+  const payload: any = { type: comp.type, league, finished: displayCount, competition_id: comp.id };
+  if (comp.type === "combine") payload.events = events;
 
-  const attempt = participant ? await currentAttempt(participant.id) : null;
-  const total = comp.type === "wonderlic" ? (comp.config?.question_count ?? 30) : null;
-  if (attempt?.status === "finished") {
-    payload.result = { score: Number(attempt.score), total, duration_ms: attempt.duration_ms };
-    if (comp.type === "wonderlic" && !light) {
-      // Answer-key review sits behind a (currently open) monetization gate,
-      // keyed to the commissioner's account. log:false — this path is polled.
-      const gate = await checkGate("missed_review", comp.admin_id, { log: false });
-      if (gate.open) {
-        payload.missed = await missedQuestions(attempt, comp);
-      } else {
-        payload.missed_locked = true;
-        payload.missed_paywall = gate.paywall;
+  const atts: Record<string, any> = participant ? await attemptsByEvent(participant.id) : {};
+  const allFinished = !!participant && events.every((e) => atts[e]?.status === "finished");
+
+  if (allFinished && comp.type !== "random_order") {
+    if (comp.type === "combine") {
+      payload.result = {
+        events: events.map((e) => ({ key: e, score: Number(atts[e].score), duration_ms: atts[e].duration_ms })),
+        duration_ms: events.reduce((sum, e) => sum + (atts[e].duration_ms ?? 0), 0),
+        total: null,
+      };
+    } else {
+      const a = atts[comp.type];
+      payload.result = {
+        score: Number(a.score),
+        total: comp.type === "wonderlic" ? (comp.config?.question_count ?? 30) : null,
+        duration_ms: a.duration_ms,
+      };
+    }
+  }
+
+  // The answer key (paid, per-seat). Only competitions with a test event have
+  // one, and only a participant whose own test attempt is finished may see or
+  // buy it — that single rule keeps answers away from anyone still playing.
+  if (!light && participant && events.includes("wonderlic")) {
+    const testAtt = atts["wonderlic"];
+    if (testAtt?.status === "finished") {
+      let entitled = await participantKeyEntitled(participant.id);
+      if (!entitled) {
+        // Organizer's included access: Ultimate covers their own competitions,
+        // but their seat still has to be finished (checked above).
+        const admin = await requireAdmin(c);
+        if (admin && admin.id === comp.admin_id && (await hasEntitlement(admin.id, "ultimate"))) {
+          entitled = true;
+        }
       }
+      if (entitled) {
+        payload.answer_key = await buildAnswerKey(comp, participant);
+      } else {
+        payload.key_locked = true;
+        payload.key_price = PRICES.answer_key;
+      }
+    } else {
+      payload.key_teaser = true; // hasn't finished: locked, with an explanation
     }
   }
 
@@ -133,6 +147,21 @@ async function memberState(c: any, comp: any, light = false) {
         where competition_id = ${comp.id} and not is_placeholder
         order by created_at`;
       return { roster: roster.map((r: any) => r.display_name) };
+    }
+    if (comp.type === "combine") {
+      const rows = await sql`
+        select p.display_name, p.real_name,
+          (select count(distinct a.event_key)::int from attempts a
+            where a.participant_id = p.id and a.status = 'finished'
+              and a.event_key = any(${events})) as done
+        from participants p
+        where p.competition_id = ${comp.id} and not p.is_placeholder
+        order by done desc, p.created_at`;
+      return {
+        roster_combine: rows.map((r: any) => ({
+          name: r.display_name, real_name: r.real_name, done: r.done, total: events.length,
+        })),
+      };
     }
     const rows = await sql`
       select p.display_name, p.real_name, a.score, a.duration_ms from attempts a
@@ -158,15 +187,29 @@ async function memberState(c: any, comp: any, light = false) {
     payload.phase = "lobby";
     return payload;
   }
-  if (!attempt) {
-    payload.phase = "ready";
-    Object.assign(payload, await currentLeaderboard());
+
+  const currentEvent = events.find((e) => atts[e]?.status !== "finished");
+  if (!currentEvent) {
+    payload.phase = "done";
+    if (comp.type !== "combine") {
+      const a = atts[comp.type];
+      payload.timed_out = a.duration_ms != null && a.duration_ms >= (comp.config?.time_limit_seconds ?? 360) * 1000;
+    }
+    if (!light) Object.assign(payload, await currentLeaderboard());
     return payload;
   }
-  if (attempt.status === "finished") {
-    payload.phase = "done";
-    payload.timed_out = attempt.duration_ms != null && attempt.duration_ms >= (comp.config?.time_limit_seconds ?? 360) * 1000;
-    if (!light) Object.assign(payload, await currentLeaderboard());
+
+  payload.event = { key: currentEvent, index: events.indexOf(currentEvent), total: events.length };
+  if (comp.type === "combine") {
+    payload.completed_events = events
+      .filter((e) => atts[e]?.status === "finished")
+      .map((e) => ({ key: e, score: Number(atts[e].score) }));
+  }
+
+  const attempt = atts[currentEvent];
+  if (!attempt) {
+    payload.phase = "ready";
+    if (payload.event.index === 0) Object.assign(payload, await currentLeaderboard());
     return payload;
   }
   const ms = await remainingMs(attempt);
@@ -175,7 +218,7 @@ async function memberState(c: any, comp: any, light = false) {
     return await memberState(c, comp, light);
   }
   const st = attemptState(attempt);
-  if (comp.type === "trex") {
+  if (currentEvent === "trex") {
     payload.phase = "game";
     payload.remaining_ms = ms;
     payload.run_index = (st.runs ?? []).length;
@@ -221,24 +264,28 @@ app.post("/c/:token/join", async (c) => {
   return c.json({ ok: true, participant_token: res.participant.session_token });
 });
 
+// Start (or resume) the participant's current event.
 app.post("/c/:token/start", async (c) => {
   const comp = await competitionByShareToken(c.req.param("token"));
   if (!comp) return c.json({ phase: "error", error: "Competition not found." }, 404);
   const participant = await participantBySession(comp.id, c.req.header("x-pt"));
   if (!participant) return c.json({ phase: "error", error: "Join first." });
-  if ((comp.type === "wonderlic" || comp.type === "trex") && comp.status === "active") {
-    await startAttempt(comp, participant);
+  if (comp.type !== "random_order" && comp.status === "active") {
+    const events = eventsFor(comp);
+    const atts = await attemptsByEvent(participant.id);
+    const currentEvent = events.find((e) => atts[e]?.status !== "finished");
+    if (currentEvent) await startAttempt(comp, participant, currentEvent);
   }
   return c.json(await memberState(c, comp));
 });
 
-// T-Rex: record one run (practice or real). The 4th run finalizes the attempt.
+// The Dash: record one run (practice or real). The final run finalizes the event.
 app.post("/c/:token/run", async (c) => {
   const comp = await competitionByShareToken(c.req.param("token"));
   if (!comp) return c.json({ phase: "error", error: "Competition not found." }, 404);
   const participant = await participantBySession(comp.id, c.req.header("x-pt"));
-  const attempt = participant ? await currentAttempt(participant.id) : null;
-  if (comp.type === "trex" && attempt && attempt.status === "in_progress") {
+  const attempt = participant ? await currentAttempt(participant.id, "trex") : null;
+  if (attempt && attempt.status === "in_progress") {
     const body = await c.req.json().catch(() => ({}));
     await submitRun(comp, attempt, Number(body.score));
   }
@@ -249,7 +296,7 @@ app.post("/c/:token/answer", async (c) => {
   const comp = await competitionByShareToken(c.req.param("token"));
   if (!comp) return c.json({ phase: "error", error: "Competition not found." }, 404);
   const participant = await participantBySession(comp.id, c.req.header("x-pt"));
-  const attempt = participant ? await currentAttempt(participant.id) : null;
+  const attempt = participant ? await currentAttempt(participant.id, "wonderlic") : null;
   if (attempt && attempt.status === "in_progress") {
     const body = await c.req.json().catch(() => ({}));
     await submitAnswer(comp, attempt, String(body.question_id ?? ""), Number(body.displayed_index));
@@ -263,7 +310,7 @@ app.get("/r/:rtoken/data.json", async (c) => {
   const comp = await competitionByResultsToken(c.req.param("rtoken"));
   if (!comp) return c.json({ error: "not found" }, 404);
   await sweepExpired(comp);
-  const finished = await finishedCount(comp.id);
+  const finished = await finishedCount(comp);
   const visible = standingsVisible(comp, finished);
   return c.json({
     visible,
@@ -346,7 +393,13 @@ app.get("/api/admin/dashboard", async (c) => {
   const competitions = await sql`
     select id, name, member_count, type, status, created_at
     from competitions where admin_id = ${admin.id} order by created_at desc`;
-  return c.json({ email: admin.email, competitions, is_owner: await isOwner(admin.email) });
+  return c.json({
+    email: admin.email,
+    competitions,
+    is_owner: await isOwner(admin.email),
+    entitlements: { ultimate: await hasEntitlement(admin.id, "ultimate") },
+    prices: PRICES,
+  });
 });
 
 // Owner-only business metrics: overview counts plus per-account detail.
@@ -398,13 +451,24 @@ app.post("/api/admin/competitions", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const name = String(b.name ?? "").trim().slice(0, 60);
   const members = parseInt(b.member_count, 10);
-  const type = ["random_order", "trex"].includes(String(b.type)) ? String(b.type) : "wonderlic";
+  const type = ["random_order", "trex", "combine"].includes(String(b.type)) ? String(b.type) : "wonderlic";
   if (!name) return c.json({ error: "Give your league a name." });
   if (!(members >= 2 && members <= 64)) return c.json({ error: "Members must be between 2 and 64." });
+  // Premium gates — enforced here, not just in the UI.
+  const ultimate = await hasEntitlement(admin.id, "ultimate");
+  if (members > 12 && !ultimate) {
+    return c.json({ error: "The free tier caps at 12 players.", upsell: "ultimate" });
+  }
+  if (type === "combine" && !ultimate) {
+    return c.json({ error: "The Skill and Wit Combine needs Ultimate.", upsell: "ultimate" });
+  }
   const config = type === "wonderlic"
     ? { bank_version: 1, question_count: 30, time_limit_seconds: 360, max_attempts: 1 }
     : type === "trex"
     ? { practice_runs: 3, session_limit_seconds: 900, max_attempts: 1 }
+    : type === "combine"
+    ? { events: ["wonderlic", "trex"], bank_version: 1, question_count: 30,
+        time_limit_seconds: 360, practice_runs: 3, session_limit_seconds: 900, max_attempts: 1 }
     : { max_attempts: 1 };
   const [comp] = await sql`
     insert into competitions (admin_id, name, member_count, type, config)
@@ -422,7 +486,10 @@ app.post("/api/admin/competition/:id/settings", async (c) => {
   const b = await c.req.json().catch(() => ({}));
   const name = String(b.name ?? "").trim().slice(0, 60) || comp.name;
   const members = parseInt(b.member_count, 10);
-  const memberCount = members >= 2 && members <= 64 ? members : comp.member_count;
+  let memberCount = members >= 2 && members <= 64 ? members : comp.member_count;
+  if (memberCount > 12 && !(await hasEntitlement(admin.id, "ultimate"))) {
+    return c.json({ error: "The free tier caps at 12 players.", upsell: "ultimate" });
+  }
   await sql`
     update competitions set name = ${name}, member_count = ${memberCount}
     where id = ${comp.id}`;
@@ -517,28 +584,107 @@ app.get("/api/admin/competition/:id/live", async (c) => {
   const comp = await ownedCompetition(admin.id, c.req.param("id"));
   if (!comp) return c.json({ error: "not found" }, 404);
   await sweepExpired(comp);
+  const events = eventsFor(comp);
   const rows = await sql`
-    select p.id, p.display_name, p.real_name, p.is_dnf, a.status as astatus, a.score, a.duration_ms, a.started_at
+    select p.id, p.display_name, p.real_name, p.is_dnf, p.created_at,
+      count(a.id) filter (where a.started_at is not null)::int as started_events,
+      count(a.id) filter (where a.status = 'finished')::int as done_events,
+      max(a.score) filter (where a.event_key = 'wonderlic' and a.status = 'finished') as test_score,
+      max(a.score) filter (where a.event_key = 'trex' and a.status = 'finished') as dash_score,
+      max(a.score) filter (where a.status = 'finished') as any_score,
+      sum(a.duration_ms) filter (where a.status = 'finished')::int as total_dur
     from participants p
     left join attempts a on a.participant_id = p.id
     where p.competition_id = ${comp.id}
+    group by p.id
     order by p.created_at`;
-  const finished = await finishedCount(comp.id);
+  const finished = await finishedCount(comp);
   return c.json({
     finished,
     member_count: comp.member_count,
     status: comp.status,
-    participants: rows.map((r: any) => ({
-      id: r.id,
-      name: r.display_name,
-      real_name: r.real_name,
-      dnf: r.is_dnf,
-      started: r.started_at != null,
-      finished: r.astatus === "finished",
-      score: r.astatus === "finished" && !r.is_dnf ? Number(r.score) : null,
-      duration_ms: r.astatus === "finished" && !r.is_dnf ? r.duration_ms : null,
-    })),
+    events: events.length,
+    participants: rows.map((r: any) => {
+      const done = r.done_events >= events.length && !r.is_dnf;
+      let score: any = null;
+      if (done) {
+        score = comp.type === "combine"
+          ? `T:${r.test_score ?? "—"} D:${r.dash_score ?? "—"}`
+          : Number(r.any_score);
+      } else if (comp.type === "combine" && r.done_events > 0 && !r.is_dnf) {
+        score = `${r.done_events}/${events.length} events`;
+      }
+      return {
+        id: r.id,
+        name: r.display_name,
+        real_name: r.real_name,
+        dnf: r.is_dnf,
+        started: r.started_events > 0,
+        finished: done,
+        score,
+        duration_ms: done ? r.total_dur : null,
+      };
+    }),
   });
+});
+
+// ---------------- entitlements (mock purchases; real payments swap in later) ----------------
+
+app.post("/api/entitlements/grant", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const sku = String(b.sku ?? "");
+
+  if (sku === "ultimate") {
+    const admin = await requireAdmin(c);
+    if (!admin) return c.json({ error: "unauthorized" }, 401);
+    await sql`
+      insert into entitlements (sku, admin_id, source) values ('ultimate', ${admin.id}, 'mock')
+      on conflict (admin_id, sku) where sku = 'ultimate' do nothing`;
+    await logEvent("purchase_mock", { adminId: admin.id, props: { sku, price: PRICES.ultimate } });
+    return c.json({ ok: true, sku, price: PRICES.ultimate });
+  }
+
+  if (sku === "answer_key") {
+    const compId = String(b.competition_id ?? "");
+    const rows = await sql`select * from competitions where id = ${compId}`.catch(() => []);
+    const comp = rows[0];
+    if (!comp) return c.json({ error: "Competition not found." }, 404);
+    const participant = await participantBySession(comp.id, c.req.header("x-pt"));
+    if (!participant) return c.json({ error: "unauthorized" }, 401);
+    // Eligibility: your own test attempt must be finished. This is the rule
+    // that keeps answers away from anyone who hasn't played yet.
+    const testAtt = await currentAttempt(participant.id, "wonderlic");
+    if (testAtt?.status !== "finished") {
+      return c.json({ error: "Finish your test first — then the key unlocks." }, 403);
+    }
+    await sql`
+      insert into entitlements (sku, competition_id, granted_to_participant_id, source)
+      values ('answer_key', ${comp.id}, ${participant.id}, 'mock')
+      on conflict (granted_to_participant_id, sku) where sku = 'answer_key' do nothing`;
+    await logEvent("purchase_mock", {
+      competitionId: comp.id, participantId: participant.id,
+      props: { sku, price: PRICES.answer_key },
+    });
+    return c.json({ ok: true, sku, price: PRICES.answer_key });
+  }
+
+  return c.json({ error: "Unknown sku." }, 400);
+});
+
+// Organizer's league-wide key view (Ultimate), once the competition is complete.
+app.get("/api/admin/competition/:id/answer_key", async (c) => {
+  const admin = await requireAdmin(c);
+  if (!admin) return c.json({ error: "unauthorized" }, 401);
+  const comp = await ownedCompetition(admin.id, c.req.param("id"));
+  if (!comp) return c.json({ error: "not found" }, 404);
+  if (!(await hasEntitlement(admin.id, "ultimate"))) return c.json({ error: "Requires Ultimate.", upsell: "ultimate" }, 403);
+  if (!eventsFor(comp).includes("wonderlic")) return c.json({ error: "This competition has no test event." });
+  const finished = await finishedCount(comp);
+  if (comp.status !== "closed" && finished < comp.member_count) {
+    return c.json({ error: "Available once the competition is complete.", pending: true });
+  }
+  const key = await buildAnswerKey(comp, { id: "00000000-0000-0000-0000-000000000000" });
+  return c.json({ members: key.members });
 });
 
 // ---------------- serve (normalize hosted path prefixes) ----------------
