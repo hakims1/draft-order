@@ -113,7 +113,10 @@ No schema migration needed:
    `competitions` (one `alter table` — the only SQL touch, and it's additive).
 2. Put its settings in `config` when creating the competition
    (e.g. `{max_attempts: 3, level_seed: …}`).
-3. Server: branch on `comp.type` in `logic.ts`/`index.ts` — implement start/score/finalize
+3. Server: branch on the **event key** in `logic.ts`/`index.ts` — attempts carry
+   `event_key` (one attempt per participant per event; the `combine` type runs
+   `config.events = ["wonderlic","trex"]` and averages per-event positions in
+   `standings()`). Implement start/score/finalize
    writing generic `score` + `duration_ms` on `attempts` (use `state` jsonb for anything
    game-specific). Ranking, standings visibility, closing, DNF handling, and the reveal
    all work off `score`/`duration_ms` and are type-agnostic already.
@@ -152,8 +155,11 @@ where key = 'monetization';
 - **Experiment `paywall_placement_v1`:** admins are hash-bucketed once
   (sticky, persisted in `admin_experiments`) into `gate_at_activation`
   (paywall before launch) or `upsell_later` (free launch, answer key gated).
-- **Entitlements:** a row in `entitlements` (product `pro`) passes every gate —
-  this is where a Stripe webhook will write when payments exist.
+- **Entitlements (live, mock checkout):** `entitlements` rows gate real features —
+  `ultimate` ($19, account-level: >12 players, the Combine, organizer answer key)
+  and `answer_key` ($5, per-seat, requires a finished attempt). Granted via
+  `POST /api/entitlements/grant` (idempotent); a Stripe webhook will replace the
+  mock grant when payments exist. Prices live in `PRICES` in `logic.ts`.
 - **Funnel events** land in `events`: `gate_hit`, `experiment_assigned`,
   `competition_activated`, `member_joined`, `attempt_started`,
   `attempt_finished`, `participant_deleted`.
