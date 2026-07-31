@@ -46,18 +46,12 @@ export function attemptState(attempt: any): any {
 // ---------- lookups ----------
 
 export async function competitionByShareToken(token: string) {
-  const rows = await sql`
-    select c.*, l.name as league_name, l.season_year, l.member_count, l.admin_id
-    from competitions c join leagues l on l.id = c.league_id
-    where c.share_token = ${token}`;
+  const rows = await sql`select * from competitions where share_token = ${token}`;
   return rows[0] ?? null;
 }
 
 export async function competitionByResultsToken(token: string) {
-  const rows = await sql`
-    select c.*, l.name as league_name, l.season_year, l.member_count, l.admin_id
-    from competitions c join leagues l on l.id = c.league_id
-    where c.results_token = ${token}`;
+  const rows = await sql`select * from competitions where results_token = ${token}`;
   return rows[0] ?? null;
 }
 
@@ -358,12 +352,11 @@ export async function closeCompetition(competitionId: string) {
       await generateRandomOrder(tx, competitionId);
     }
 
-    // Unfilled league slots become placeholder DNFs so ranks 1..N are all assigned.
-    const [league] = await tx`select member_count from leagues where id = ${comp.league_id}`;
+    // Unfilled slots become placeholder DNFs so ranks 1..N are all assigned.
     const [{ n }] = await tx`
       select count(*)::int as n from participants
       where competition_id = ${competitionId}`;
-    for (let i = n + 1; i <= league.member_count; i++) {
+    for (let i = n + 1; i <= comp.member_count; i++) {
       await tx`
         insert into participants (competition_id, display_name, is_dnf, is_placeholder)
         values (${competitionId}, ${"Did not start (" + (i - n) + ")"}, true, true)`;

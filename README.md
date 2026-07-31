@@ -58,7 +58,7 @@ supabase/
 
 ## Data model (the short version)
 
-`admins → leagues → competitions → participants → attempts`
+`admins → competitions → participants → attempts` (the former `leagues` layer was collapsed into competitions — one-shot usage, no season concept)
 
 - `competitions.config` (jsonb) holds all type-specific settings
   (`{bank_version, question_count, time_limit_seconds, max_attempts}` for wonderlic).

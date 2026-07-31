@@ -98,7 +98,7 @@ async function memberState(c: any, comp: any, light = false) {
     select count(*)::int as joined from participants
     where competition_id = ${comp.id} and not is_placeholder`;
   const visible = standingsVisible(comp, finished);
-  const league = { name: comp.league_name, season_year: comp.season_year, member_count: comp.member_count };
+  const league = { name: comp.name, member_count: comp.member_count };
   const displayCount = comp.type === "random_order" ? joined : finished;
   const payload: any = { type: comp.type, league, finished: displayCount };
 
@@ -269,8 +269,7 @@ app.get("/r/:rtoken/data.json", async (c) => {
     visible,
     finished,
     member_count: comp.member_count,
-    league_name: comp.league_name,
-    season_year: comp.season_year,
+    league_name: comp.name,
     type: comp.type,
     // Before the reveal this is the live partial ranking (finishers only);
     // once visible it is the final order including DNFs.
@@ -344,13 +343,10 @@ app.post("/admin/logout", async (c) => {
 app.get("/api/admin/dashboard", async (c) => {
   const admin = await requireAdmin(c);
   if (!admin) return c.json({ error: "unauthorized" }, 401);
-  const leagues: any[] = await sql`
-    select * from leagues where admin_id = ${admin.id} order by created_at desc`;
-  for (const l of leagues) {
-    l.competitions = await sql`
-      select id, type, status from competitions where league_id = ${l.id} order by created_at desc`;
-  }
-  return c.json({ email: admin.email, leagues, is_owner: await isOwner(admin.email) });
+  const competitions = await sql`
+    select id, name, member_count, type, status, created_at
+    from competitions where admin_id = ${admin.id} order by created_at desc`;
+  return c.json({ email: admin.email, competitions, is_owner: await isOwner(admin.email) });
 });
 
 // Owner-only business metrics: overview counts plus per-account detail.
@@ -361,14 +357,13 @@ app.get("/api/admin/metrics", async (c) => {
 
   const [totals] = await sql`
     with comp_state as (
-      select c.id, c.status, c.type, l.member_count,
+      select c.id, c.status, c.type, c.member_count,
         (select count(*) from attempts a join participants p on p.id = a.participant_id
           where p.competition_id = c.id and a.status = 'finished') as fin
-      from competitions c join leagues l on l.id = c.league_id
+      from competitions c
     )
     select
       (select count(*)::int from admins) as accounts,
-      (select count(*)::int from leagues) as leagues,
       (select count(*)::int from comp_state) as competitions,
       (select count(*)::int from comp_state where status = 'draft') as drafts,
       (select count(*)::int from comp_state where status = 'closed' or (status = 'active' and fin >= member_count)) as completed,
@@ -383,13 +378,11 @@ app.get("/api/admin/metrics", async (c) => {
 
   const accounts = await sql`
     select a.email, a.created_at,
-      count(distinct l.id)::int as leagues,
       count(distinct c.id)::int as competitions,
       count(distinct p.id) filter (where not p.is_placeholder)::int as members_joined,
       count(distinct at.id) filter (where at.status = 'finished')::int as finished
     from admins a
-    left join leagues l on l.admin_id = a.id
-    left join competitions c on c.league_id = l.id
+    left join competitions c on c.admin_id = a.id
     left join participants p on p.competition_id = c.id
     left join attempts at on at.participant_id = p.id
     group by a.id, a.email, a.created_at
@@ -398,83 +391,48 @@ app.get("/api/admin/metrics", async (c) => {
   return c.json({ totals, accounts });
 });
 
-app.post("/api/admin/leagues", async (c) => {
+// One-step creation: game type + name + member count -> a draft competition.
+app.post("/api/admin/competitions", async (c) => {
   const admin = await requireAdmin(c);
   if (!admin) return c.json({ error: "unauthorized" }, 401);
   const b = await c.req.json().catch(() => ({}));
   const name = String(b.name ?? "").trim().slice(0, 60);
-  const year = parseInt(b.season_year, 10);
   const members = parseInt(b.member_count, 10);
-  if (!name) return c.json({ error: "Give the league a name." });
-  if (!(year >= 2000 && year <= 2100)) return c.json({ error: "Season year looks wrong." });
-  if (!(members >= 2 && members <= 64)) return c.json({ error: "Members must be between 2 and 64." });
-  const [l] = await sql`
-    insert into leagues (admin_id, name, season_year, member_count)
-    values (${admin.id}, ${name}, ${year}, ${members}) returning id`;
-  return c.json({ id: l.id });
-});
-
-async function ownedLeague(adminId: string, leagueId: string) {
-  const rows = await sql`
-    select * from leagues where id = ${leagueId} and admin_id = ${adminId}`.catch(() => []);
-  return rows[0] ?? null;
-}
-
-app.get("/api/admin/league/:id", async (c) => {
-  const admin = await requireAdmin(c);
-  if (!admin) return c.json({ error: "unauthorized" }, 401);
-  const league = await ownedLeague(admin.id, c.req.param("id"));
-  if (!league) return c.json({ error: "not found" }, 404);
-  const competitions = await sql`
-    select id, type, status, created_at from competitions
-    where league_id = ${league.id} order by created_at desc`;
-  return c.json({ league, competitions });
-});
-
-app.post("/api/admin/league/:id", async (c) => {
-  const admin = await requireAdmin(c);
-  if (!admin) return c.json({ error: "unauthorized" }, 401);
-  const league = await ownedLeague(admin.id, c.req.param("id"));
-  if (!league) return c.json({ error: "not found" }, 404);
-  const b = await c.req.json().catch(() => ({}));
-  const name = String(b.name ?? "").trim().slice(0, 60) || league.name;
-  const year = parseInt(b.season_year, 10) || league.season_year;
-  const members = parseInt(b.member_count, 10);
-  const memberCount = members >= 2 && members <= 64 ? members : league.member_count;
-  await sql`
-    update leagues set name = ${name}, season_year = ${year}, member_count = ${memberCount}
-    where id = ${league.id}`;
-  return c.json({ ok: true });
-});
-
-app.post("/api/admin/league/:id/competitions", async (c) => {
-  const admin = await requireAdmin(c);
-  if (!admin) return c.json({ error: "unauthorized" }, 401);
-  const league = await ownedLeague(admin.id, c.req.param("id"));
-  if (!league) return c.json({ error: "not found" }, 404);
-  const [{ n: existingComps }] = await sql`
-    select count(*)::int as n from competitions where league_id = ${league.id}`;
-  if (existingComps > 0) {
-    return c.json({ error: "This league already has a competition. One competition per league for now." });
-  }
-  const b = await c.req.json().catch(() => ({}));
   const type = ["random_order", "trex"].includes(String(b.type)) ? String(b.type) : "wonderlic";
+  if (!name) return c.json({ error: "Give your league a name." });
+  if (!(members >= 2 && members <= 64)) return c.json({ error: "Members must be between 2 and 64." });
   const config = type === "wonderlic"
     ? { bank_version: 1, question_count: 30, time_limit_seconds: 360, max_attempts: 1 }
     : type === "trex"
     ? { practice_runs: 3, session_limit_seconds: 900, max_attempts: 1 }
     : { max_attempts: 1 };
   const [comp] = await sql`
-    insert into competitions (league_id, type, config)
-    values (${league.id}, ${type}, ${JSON.stringify(config)}::jsonb) returning id`;
+    insert into competitions (admin_id, name, member_count, type, config)
+    values (${admin.id}, ${name}, ${members}, ${type}, ${JSON.stringify(config)}::jsonb)
+    returning id`;
   return c.json({ id: comp.id });
+});
+
+// Edit name/size after creation (from the competition page).
+app.post("/api/admin/competition/:id/settings", async (c) => {
+  const admin = await requireAdmin(c);
+  if (!admin) return c.json({ error: "unauthorized" }, 401);
+  const comp = await ownedCompetition(admin.id, c.req.param("id"));
+  if (!comp) return c.json({ error: "not found" }, 404);
+  const b = await c.req.json().catch(() => ({}));
+  const name = String(b.name ?? "").trim().slice(0, 60) || comp.name;
+  const members = parseInt(b.member_count, 10);
+  const memberCount = members >= 2 && members <= 64 ? members : comp.member_count;
+  await sql`
+    update competitions set name = ${name}, member_count = ${memberCount}
+    where id = ${comp.id}`;
+  return c.json({ ok: true });
 });
 
 async function ownedCompetition(adminId: string, compId: string) {
   const rows = await sql`
-    select c.*, l.name as league_name, l.season_year, l.member_count, l.id as league_id
-    from competitions c join leagues l on l.id = c.league_id
-    where c.id = ${compId} and l.admin_id = ${adminId}`.catch(() => []);
+    select * from competitions
+    where id = ${compId} and admin_id = ${adminId}`.catch(() => []);
   return rows[0] ?? null;
 }
 
@@ -485,11 +443,11 @@ app.get("/api/admin/competition/:id", async (c) => {
   if (!comp) return c.json({ error: "not found" }, 404);
   return c.json({
     competition: {
-      id: comp.id, type: comp.type, status: comp.status, config: comp.config,
+      id: comp.id, name: comp.name, member_count: comp.member_count,
+      type: comp.type, status: comp.status, config: comp.config,
       share_token: comp.share_token, results_token: comp.results_token,
       activated_at: comp.activated_at, closed_at: comp.closed_at,
     },
-    league: { id: comp.league_id, name: comp.league_name, season_year: comp.season_year, member_count: comp.member_count },
   });
 });
 

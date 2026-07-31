@@ -425,7 +425,7 @@ function memberView(TOKEN) {
       }
 
       app().innerHTML =
-        '<div class="fade-in" style="text-align:left"><div class="kicker">' + esc(L.name) + " &middot; " + L.season_year + '</div>' +
+        '<div class="fade-in" style="text-align:left"><div class="kicker">' + esc(L.name) + '</div>' +
         "<h1>" + (isW ? "Draft Order<br>Cognitive Test" : isT ? "T-Rex<br>Run-Off" : "Random<br>Draft Order") + "</h1>" +
         rules +
         '<div class="card">' +
@@ -510,7 +510,7 @@ function memberView(TOKEN) {
 
     if (S.phase === "standings") {
       app().innerHTML =
-        '<div class="fade-in" style="text-align:left"><div class="kicker">' + esc(L.name) + " &middot; " + L.season_year + '</div>' +
+        '<div class="fade-in" style="text-align:left"><div class="kicker">' + esc(L.name) + '</div>' +
         "<h1>The results are in</h1>" +
         (S.result ? '<div class="sub">You scored ' + S.result.score + (S.result.total ? "/" + S.result.total : "") + " in " + fmtDur(S.result.duration_ms) + ".</div>" : "") +
         '<div id="reveal"></div>' + missedCardHtml(S) + ctaCardHtml(true) + "</div>";
@@ -542,7 +542,7 @@ async function resultsView(TOKEN) {
     const showScore = r.type === "wonderlic";
     const rows = (r.standings || []).filter((s) => !s.dnf);
     app().innerHTML =
-      '<div style="text-align:left"><div class="kicker">' + esc(r.league_name) + " &middot; " + r.season_year + '</div>' +
+      '<div style="text-align:left"><div class="kicker">' + esc(r.league_name) + '</div>' +
       "<h1>Live Standings</h1>" +
       '<div class="sub">' + r.finished + " of " + r.member_count + " members have finished &middot; this page updates automatically</div>" +
       '<div class="card">' +
@@ -552,7 +552,7 @@ async function resultsView(TOKEN) {
     return;
   }
   app().innerHTML =
-    '<div style="text-align:left"><div class="kicker">' + esc(r.league_name) + " &middot; " + r.season_year + '</div><h1>Official Draft Order</h1>' +
+    '<div style="text-align:left"><div class="kicker">' + esc(r.league_name) + '</div><h1>Official Draft Order</h1>' +
     '<div id="reveal"></div></div>';
   renderReveal($("#reveal"), r.standings, { showScore: r.type === "wonderlic", shareUrl: location.href });
 }
@@ -624,82 +624,32 @@ async function adminHome() {
       <button class="btn ghost small" id="logoutBtn">Log out</button></div>
     </div>
     <div class="mut">${esc(d.email)}</div>
-    ${d.leagues.map((l) => {
-      const comp = l.competitions[0];
-      return `
+    ${d.competitions.map((k) => `
       <div class="card">
         <div class="row spread">
-          <div><h2>${esc(l.name)}</h2><div class="mut">${l.season_year} season · ${l.member_count} members
-            ${comp ? ` · ${typeName(comp.type)} ${statusTag(comp.status)}` : " · no competition yet"}</div></div>
-          <a class="btn ghost small" href="${comp ? `#/admin/comp/${comp.id}` : `#/admin/league/${l.id}`}">Manage</a>
+          <div><h2>${esc(k.name)}</h2><div class="mut">${k.member_count} members · ${typeName(k.type)} ${statusTag(k.status)}</div></div>
+          <a class="btn ghost small" href="#/admin/comp/${k.id}">Manage</a>
         </div>
-      </div>`;
-    }).join("") || '<div class="card mut">No leagues yet — create your first one below.</div>'}
+      </div>`).join("") || '<div class="card mut">No competitions yet — set one up below.</div>'}
     <div class="card">
-      <h2>New league</h2>
+      <h2>New competition</h2>
+      <label>Game type</label>
+      <select id="ctype">
+        <option value="wonderlic">Draft Day Aptitude Test — 30 questions, 6 minutes</option>
+        <option value="trex">T-Rex Runner — game of skill</option>
+        <option value="random_order">Random order draw</option>
+      </select>
       <label>League name</label><input type="text" id="lname" maxlength="60" placeholder="e.g. The Sunday Regrets">
-      <label>Season year</label><input type="number" id="lyear" value="${new Date().getFullYear()}">
       <label>Number of members</label><input type="number" id="lmembers" value="12" min="2" max="64">
       <div class="err" id="lerr"></div>
-      <button class="btn" id="lcreate">Create league</button>
+      <button class="btn" id="lcreate">Create competition</button>
     </div></div>`;
   $("#logoutBtn").onclick = () => { localStorage.removeItem("adm"); renderLogin(); };
   $("#lcreate").onclick = async () => {
-    const r = await aapi("/api/admin/leagues", {
-      name: $("#lname").value, season_year: Number($("#lyear").value), member_count: Number($("#lmembers").value),
+    const r = await aapi("/api/admin/competitions", {
+      type: $("#ctype").value, name: $("#lname").value, member_count: Number($("#lmembers").value),
     });
     if (r.error) { $("#lerr").textContent = r.error; return; }
-    location.hash = "#/admin/league/" + r.id;
-  };
-}
-
-async function leagueView(id) {
-  clearTimers();
-  let d;
-  try { d = await aapi("/api/admin/league/" + id); } catch { return; }
-  if (d.error) return adminHome();
-  // One competition per league: if it exists, managing the league IS managing
-  // the competition — go straight there.
-  if (d.competitions.length) {
-    location.hash = "#/admin/comp/" + d.competitions[0].id;
-    return;
-  }
-  wrap().classList.add("wide");
-  const l = d.league;
-  app().innerHTML = `
-    <div style="text-align:left">
-    <div style="margin-top:10px"><a href="#/admin" class="mut">← Dashboard</a></div>
-    <div class="kicker" style="margin-top:10px">${l.season_year} season</div>
-    <h1>${esc(l.name)}</h1>
-    <div class="card">
-      <h2>Pick your competition</h2>
-      <div class="mut">How should the ${l.member_count} draft slots be decided?</div>
-      <label style="margin-top:16px">Competition type</label>
-      <select id="ctype">
-        <option value="wonderlic">Wonderlic-style timed test</option>
-        <option value="trex">T-Rex Runner (game of skill)</option>
-        <option value="random_order">Random order generator</option>
-      </select>
-      <div class="err" id="cerr"></div>
-      <button class="btn" id="ccreate">Create competition</button>
-    </div>
-    <div class="card">
-      <h2>League settings</h2>
-      <label>League name</label><input type="text" id="lname" value="${esc(l.name)}" maxlength="60">
-      <label>Season year</label><input type="number" id="lyear" value="${l.season_year}">
-      <label>Number of members (competition slots)</label><input type="number" id="lmembers" value="${l.member_count}" min="2" max="64">
-      <div class="okmsg" id="lmsg"></div>
-      <button class="btn ghost" id="lsave">Save changes</button>
-    </div></div>`;
-  $("#lsave").onclick = async () => {
-    await aapi("/api/admin/league/" + id, {
-      name: $("#lname").value, season_year: Number($("#lyear").value), member_count: Number($("#lmembers").value),
-    });
-    $("#lmsg").textContent = "Saved.";
-  };
-  $("#ccreate").onclick = async () => {
-    const r = await aapi("/api/admin/league/" + id + "/competitions", { type: $("#ctype").value });
-    if (r.error) { $("#cerr").textContent = r.error; return; }
     location.hash = "#/admin/comp/" + r.id;
   };
 }
@@ -710,7 +660,7 @@ async function compView(id) {
   try { d = await aapi("/api/admin/competition/" + id); } catch { return; }
   if (d.error) return adminHome();
   wrap().classList.add("wide");
-  const c = d.competition, l = d.league;
+  const c = d.competition;
   const typeName = TYPE_NAME(c.type);
   const shareUrl = c.share_token ? SITE + "#/c/" + c.share_token : null;
   const resultsUrl = c.results_token ? SITE + "#/r/" + c.results_token : null;
@@ -762,16 +712,15 @@ async function compView(id) {
   app().innerHTML = `
     <div style="text-align:left">
     <div style="margin-top:10px"><a href="#/admin" class="mut">← Dashboard</a></div>
-    <div class="kicker" style="margin-top:10px">${esc(l.name)} · ${l.season_year}</div>
+    <div class="kicker" style="margin-top:10px">${esc(c.name)}</div>
     <h1>${typeName}</h1>
     <div class="row" style="margin-top:6px"><span class="tag ${c.status === "active" ? "" : c.status === "closed" ? "red" : "gray"}">${c.status}</span>
     <span class="mut">${c.type === "wonderlic" ? "30 questions · 6:00 · ties broken by speed" : c.type === "trex" ? "3 practice runs · 1 real run · highest score wins" : "Order drawn when all members lock in"}</span></div>
     ${block}
     <div class="card">
-      <h2>League settings</h2>
-      <label>League name</label><input type="text" id="lname" value="${esc(l.name)}" maxlength="60">
-      <label>Season year</label><input type="number" id="lyear" value="${l.season_year}">
-      <label>Number of members (competition slots)</label><input type="number" id="lmembers" value="${l.member_count}" min="2" max="64">
+      <h2>Competition settings</h2>
+      <label>League name</label><input type="text" id="lname" value="${esc(c.name)}" maxlength="60">
+      <label>Number of members (draft slots)</label><input type="number" id="lmembers" value="${c.member_count}" min="2" max="64">
       <div class="okmsg" id="lmsg"></div>
       <button class="btn ghost" id="lsave">Save changes</button>
     </div></div>`;
@@ -797,8 +746,8 @@ async function compView(id) {
     });
   }
   $("#lsave").onclick = async () => {
-    await aapi("/api/admin/league/" + id, {
-      name: $("#lname").value, season_year: Number($("#lyear").value), member_count: Number($("#lmembers").value),
+    await aapi("/api/admin/competition/" + id + "/settings", {
+      name: $("#lname").value, member_count: Number($("#lmembers").value),
     });
     $("#lmsg").textContent = "Saved.";
   };
@@ -1021,7 +970,7 @@ function route() {
   if (h.match(/^#\/login/)) return localStorage.getItem("adm") ? adminHome() : renderLogin();
   if (h.match(/^#\/admin\/signup/)) return localStorage.getItem("adm") ? adminHome() : renderLogin("", "signup");
   if (h.match(/^#\/admin\/metrics/)) return metricsView();
-  if ((m = h.match(/^#\/admin\/league\/([\w-]+)/))) return leagueView(m[1]);
+  if (h.match(/^#\/admin\/league\//)) { location.hash = "#/admin"; return; }
   if ((m = h.match(/^#\/admin\/comp\/([\w-]+)/))) return compView(m[1]);
   if (h === "" || h === "#" || h === "#/") {
     if (localStorage.getItem("adm")) { location.hash = "#/admin"; return; }
