@@ -1,7 +1,7 @@
 "use strict";
 /* Draft Order Competition — SPA. API lives on a Supabase Edge Function. */
 const API = "https://bwxsuybqhgocmwncxzlz.supabase.co/functions/v1/draftday";
-const APP_VERSION = 23;
+const APP_VERSION = 24;
 
 /* Stale-cache self-heal: if the server says a newer frontend exists, reload
    once with a cache-busting query. Guarded so it can never loop. */
