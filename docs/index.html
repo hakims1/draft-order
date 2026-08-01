@@ -8,9 +8,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- app.css must be the FIRST stylesheet: the embedded t-rex game injects
      keyframes into document.styleSheets[0], which throws on cross-origin sheets. -->
-<link rel="stylesheet" href="./app.css?v=22">
+<link rel="stylesheet" href="./app.css?v=23">
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./landing.css?v=22">
+<link rel="stylesheet" href="./landing.css?v=23">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🏈</text></svg>">
 </head>
 <body>
@@ -39,7 +39,7 @@
       <div class="lp-logo"><span class="lp-lm"><span>P</span></span><b>The Proving Ground</b></div>
       <div style="display:flex;align-items:center;gap:18px">
         <a class="lp-navlink" href="#/login">Log in</a>
-        <a class="lp-navlink" href="#/login" style="color:var(--brass)">Get started</a>
+        <a class="lp-navlink" href="#/admin/signup" style="color:var(--brass)">Get started</a>
       </div>
     </nav>
 
@@ -51,7 +51,7 @@
       <h1>Earn<br><em>your pick</em></h1>
       <p class="lp-body lp-sub">Your league takes one 6 minute test. Highest score gets to pick their position first. Nobody gets handed the top pick this year without earning it.</p>
       <div class="lp-heroCta">
-        <a class="lp-btn" id="getStarted" href="#/login">Get started</a>
+        <a class="lp-btn" id="getStarted" href="#/admin/signup">Get started</a>
         <button class="lp-btn lp-outline" type="button" data-jump="#test" style="margin-top:10px">Try the 60 second version</button>
         <button class="lp-sendline" type="button" data-copy-jump>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke-width="1.8"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M15 5H5a2 2 0 0 0-2 2v10"/></svg>
@@ -177,7 +177,7 @@
         <div class="lp-big lp-num"><span id="scoreVal">0</span><small>/5</small></div>
         <div class="lp-vs">Running visitor average <b class="lp-num" id="avgVal">3.1</b> · you finished in <b class="lp-num" id="timeVal">0:00</b></div>
         <div class="lp-turn">Think you would beat <em>your league?</em> There is one way to find out.</div>
-        <a class="lp-btn lp-brass" href="#/login" style="max-width:400px;margin:0 auto">Get started</a>
+        <a class="lp-btn lp-brass" href="#/admin/signup" style="max-width:400px;margin:0 auto">Get started</a>
       </div>
     </div>
   </div>
@@ -366,7 +366,7 @@
   </div>
   <div class="lp-shell lp-inner">
     <h2>The season starts <em>before</em> the season starts</h2>
-    <a class="lp-btn" href="#/login">Set up your league</a>
+    <a class="lp-btn" href="#/admin/signup">Set up your league</a>
   </div>
 </section>
 
@@ -377,6 +377,6 @@
   </div>
 </footer>
 </div>
-<script src="./app.js?v=22"></script>
+<script src="./app.js?v=23"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 "use strict";
 /* Draft Order Competition — SPA. API lives on a Supabase Edge Function. */
 const API = "https://bwxsuybqhgocmwncxzlz.supabase.co/functions/v1/draftday";
-const APP_VERSION = 22;
+const APP_VERSION = 23;
 
 /* Stale-cache self-heal: if the server says a newer frontend exists, reload
    once with a cache-busting query. Guarded so it can never loop. */
@@ -263,6 +263,77 @@ function wireCta(shareToken) {
       location.hash = "#/admin/signup";
     };
   });
+}
+
+
+/* "The Dash" character: an original outlined-cartoon running back in the
+   classic ball-carrier pose — ball tucked, stiff-arm extended, knees driving.
+   Drawn as SVG and rendered into the game canvas as real artwork. */
+function dashFrameSvg(pose) {
+  const OUT = "#101319", JERSEY = "#1E2942", TRIM = "#FFB01F", SKIN = "#8A5A2B",
+        PANTS = "#EDEFF5", SOCK = "#FFB01F", CLEAT = "#20242E", BALL = "#7B4222", MASK = "#97A1B4";
+  const limb = (pts, color, w) =>
+    '<polyline points="' + pts + '" fill="none" stroke="' + OUT + '" stroke-width="' + (w + 4) + '" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<polyline points="' + pts + '" fill="none" stroke="' + color + '" stroke-width="' + w + '" stroke-linecap="round" stroke-linejoin="round"/>';
+  if (pose === "duck") {
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 60">' +
+      limb("14,42 34,38", PANTS, 9) + limb("34,38 20,52", PANTS, 8) +
+      '<rect x="4" y="48" width="18" height="8" rx="3" fill="' + CLEAT + '" stroke="' + OUT + '" stroke-width="2.5"/>' +
+      '<path d="M30 26 Q56 16 78 26 L74 44 Q52 52 32 44 Z" fill="' + JERSEY + '" stroke="' + OUT + '" stroke-width="3"/>' +
+      '<ellipse cx="56" cy="44" rx="15" ry="9" transform="rotate(-8 56 44)" fill="' + BALL + '" stroke="' + OUT + '" stroke-width="2.5"/>' +
+      '<path d="M46 42 L66 40" stroke="#EDEFF5" stroke-width="2"/>' +
+      limb("64,34 58,46", SKIN, 7) +
+      '<circle cx="92" cy="26" r="13" fill="' + JERSEY + '" stroke="' + OUT + '" stroke-width="3"/>' +
+      '<path d="M84 15 A13 13 0 0 1 100 15" fill="none" stroke="' + TRIM + '" stroke-width="4"/>' +
+      '<rect x="96" y="24" width="9" height="9" rx="2" fill="' + SKIN + '" stroke="' + OUT + '" stroke-width="2"/>' +
+      '<path d="M100 26 L114 24 M100 31 L112 30" stroke="' + MASK + '" stroke-width="2.4"/>' +
+      "</svg>";
+  }
+  const legs = pose === "a"
+    ? limb("42,58 26,70 16,86", PANTS, 8) + limb("18,82 16,88", SOCK, 7) +
+      '<rect x="2" y="86" width="19" height="8" rx="3" transform="rotate(8 2 86)" fill="' + CLEAT + '" stroke="' + OUT + '" stroke-width="2.5"/>' +
+      limb("46,58 64,62 58,78", PANTS, 8) + limb("60,72 58,79", SOCK, 7) +
+      '<rect x="52" y="78" width="20" height="8" rx="3" fill="' + CLEAT + '" stroke="' + OUT + '" stroke-width="2.5"/>'
+    : limb("42,58 30,62 22,72", PANTS, 8) + limb("24,68 22,73", SOCK, 7) +
+      '<rect x="12" y="70" width="19" height="8" rx="3" transform="rotate(-14 12 70)" fill="' + CLEAT + '" stroke="' + OUT + '" stroke-width="2.5"/>' +
+      limb("46,58 58,70 64,86", PANTS, 8) + limb("62,80 64,87", SOCK, 7) +
+      '<rect x="58" y="86" width="20" height="8" rx="3" fill="' + CLEAT + '" stroke="' + OUT + '" stroke-width="2.5"/>';
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 104">' +
+    legs +
+    // torso with shoulder-pad hump, leaning into the run
+    '<path d="M38 34 Q44 24 58 24 Q70 26 68 36 L62 60 Q50 66 40 60 Z" fill="' + JERSEY + '" stroke="' + OUT + '" stroke-width="3"/>' +
+    '<rect x="44" y="38" width="16" height="4.5" rx="2" fill="' + TRIM + '"/>' +
+    '<rect x="46" y="46" width="12" height="4" rx="2" fill="' + TRIM + '"/>' +
+    // tucked arm + football
+    limb("52,34 42,46", SKIN, 7) +
+    '<ellipse cx="52" cy="50" rx="14" ry="8.5" transform="rotate(-18 52 50)" fill="' + BALL + '" stroke="' + OUT + '" stroke-width="2.5"/>' +
+    '<path d="M42 52 L62 45" stroke="#EDEFF5" stroke-width="2"/>' +
+    '<path d="M49 50 l2 -1 M53 48.6 l2 -1 M57 47.2 l2 -1" stroke="#EDEFF5" stroke-width="1.4"/>' +
+    limb("42,46 56,54", SKIN, 6) +
+    // helmet: shell, crown stripe, face, mask, ear hole
+    '<circle cx="66" cy="16" r="13.5" fill="' + JERSEY + '" stroke="' + OUT + '" stroke-width="3"/>' +
+    '<path d="M56 6 A13.5 13.5 0 0 1 76 6.5" fill="none" stroke="' + TRIM + '" stroke-width="4.5"/>' +
+    '<rect x="70" y="12" width="9.5" height="11" rx="3" fill="' + SKIN + '" stroke="' + OUT + '" stroke-width="2"/>' +
+    '<circle cx="75" cy="16" r="1.4" fill="' + OUT + '"/>' +
+    '<path d="M74 14 L90 11 M74 19 L89 17 M87 10 L88 18" fill="none" stroke="' + MASK + '" stroke-width="2.6" stroke-linecap="round"/>' +
+    '<circle cx="63" cy="17" r="2" fill="' + OUT + '" opacity=".55"/>' +
+    // stiff-arm over everything: extended up-forward, open hand
+    limb("60,32 78,24 90,12", SKIN, 7) +
+    '<path d="M88 8 l4 -4 M92 10 l5 -3 M94 14 l5 -1" stroke="' + OUT + '" stroke-width="5.5" stroke-linecap="round"/>' +
+    '<path d="M88 8 l4 -4 M92 10 l5 -3 M94 14 l5 -1" stroke="' + SKIN + '" stroke-width="3" stroke-linecap="round"/>' +
+    "</svg>";
+}
+let dashFrames = null;
+function loadDashFrames(onReady) {
+  if (dashFrames) return dashFrames;
+  dashFrames = {};
+  ["a", "b", "duck"].forEach((k) => {
+    const img = new Image();
+    img.onload = () => { if (onReady) onReady(); };
+    img.src = "data:image/svg+xml," + encodeURIComponent(dashFrameSvg(k));
+    dashFrames[k] = img;
+  });
+  return dashFrames;
 }
 
 /* ================= t-rex runner embed (vendored Chromium dino, BSD) ================= */
@@ -607,86 +678,29 @@ function memberView(TOKEN) {
       if (window.__dino && window.__dino.stopListening) { try { window.__dino.stopListening(); } catch (e) {} }
       Runner.instance_ = null;
       dino = window.__dino = new Runner("#trexCont");
-      // "The Dash": the character is a cartoon ball-carrier — ball tucked in
-      // one arm, the other extended in a stiff-arm, high-knee stride.
+      // "The Dash": outlined-cartoon ball-carrier frames, drawn as SVG art.
+      const repaintIdle = () => {
+        if (!dino || dino.playing) return;
+        try { dino.clearCanvas(); dino.horizon.update(0, 0, true); dino.tRex.draw(0, 0); } catch (e) {}
+      };
+      const frames = loadDashFrames(repaintIdle);
       const proto = Object.getPrototypeOf(dino.tRex);
       if (!proto.__dashSkin) {
         proto.__dashSkin = true;
         proto.draw = function () {
           const ctx = this.canvasCtx;
           const duck = this.ducking;
-          const X = this.xPos, Y = this.yPos;
-          const SKIN = "#8A5A2B", JERSEY = "#1E2942", PANTS = "#E8EAF0",
-                SOCK = "#C9A44C", CLEAT = "#20242E", BALL = "#7B4222", TRIM = "#FFB01F",
-                MASK = "#9AA3B5";
-          const step = this.jumping ? 0 : Math.floor(Date.now() / 110) % 2;
-          const limb = (x1, y1, x2, y2, w, color) => {
-            ctx.strokeStyle = color; ctx.lineWidth = w; ctx.lineCap = "round";
-            ctx.beginPath(); ctx.moveTo(X + x1, Y + y1); ctx.lineTo(X + x2, Y + y2); ctx.stroke();
-          };
-          ctx.save();
-          if (duck) {
-            // low slide: ball clutched, body horizontal
-            limb(10, 34, 30, 30, 9, JERSEY);            // torso
-            limb(2, 40, 12, 36, 6, PANTS);              // trailing leg
-            limb(30, 32, 42, 38, 6, PANTS);             // lead leg
-            ctx.fillStyle = SKIN; ctx.fillRect(X + 34, Y + 24, 8, 7);   // head
-            ctx.fillStyle = JERSEY;
-            ctx.beginPath(); ctx.arc(X + 38, Y + 26, 6, Math.PI, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = BALL;
-            ctx.beginPath(); ctx.ellipse(X + 22, Y + 36, 6, 3.6, 0, 0, Math.PI * 2); ctx.fill();
-            ctx.restore(); return;
-          }
-          // back leg: extended behind (pants + sock + cleat)
-          if (step) {
-            limb(14, 28, 6, 38, 6, PANTS); limb(6, 38, 4, 43, 4, SOCK);
-            ctx.fillStyle = CLEAT; ctx.fillRect(X, Y + 43, 9, 4);
-          } else {
-            limb(14, 28, 10, 40, 6, PANTS); limb(10, 40, 9, 44, 4, SOCK);
-            ctx.fillStyle = CLEAT; ctx.fillRect(X + 5, Y + 43, 9, 4);
-          }
-          // torso: leaning forward
-          ctx.fillStyle = JERSEY;
-          ctx.beginPath();
-          ctx.moveTo(X + 14, Y + 12); ctx.lineTo(X + 28, Y + 10);
-          ctx.lineTo(X + 24, Y + 30); ctx.lineTo(X + 12, Y + 30);
-          ctx.closePath(); ctx.fill();
-          ctx.fillStyle = TRIM; ctx.fillRect(X + 16, Y + 15, 9, 3); // number bar
-          // tucked arm + football against the chest
-          limb(24, 15, 16, 23, 5, SKIN);
-          ctx.fillStyle = BALL;
-          ctx.beginPath(); ctx.ellipse(X + 19, Y + 24, 6.5, 4, -0.35, 0, Math.PI * 2); ctx.fill();
-          ctx.strokeStyle = "#EDEFF5"; ctx.lineWidth = 1;
-          ctx.beginPath(); ctx.moveTo(X + 16, Y + 25.6); ctx.lineTo(X + 22, Y + 22.4); ctx.stroke();
-          // front leg: high knee stride
-          if (step) {
-            limb(16, 29, 26, 32, 6, PANTS); limb(26, 32, 27, 41, 5, SOCK);
-            ctx.fillStyle = CLEAT; ctx.fillRect(X + 24, Y + 41, 10, 4);
-          } else {
-            limb(16, 29, 24, 36, 6, PANTS); limb(24, 36, 30, 43, 5, SOCK);
-            ctx.fillStyle = CLEAT; ctx.fillRect(X + 28, Y + 43, 10, 4);
-          }
-          // helmet: shell, amber stripe, facemask
-          ctx.fillStyle = SKIN; ctx.fillRect(X + 24, Y + 2, 9, 9);
-          ctx.fillStyle = JERSEY;
-          ctx.beginPath(); ctx.arc(X + 28, Y + 6, 7, Math.PI * 0.75, Math.PI * 2.1); ctx.fill();
-          ctx.fillStyle = TRIM; ctx.fillRect(X + 23, Y - 1, 11, 2.4);
-          ctx.strokeStyle = MASK; ctx.lineWidth = 1.4;
-          ctx.beginPath(); ctx.moveTo(X + 32, Y + 6); ctx.lineTo(X + 38, Y + 5); ctx.stroke();
-          ctx.beginPath(); ctx.moveTo(X + 32, Y + 9); ctx.lineTo(X + 37, Y + 8); ctx.stroke();
-          // stiff-arm: extended up-forward with an open hand
-          limb(26, 13, 40, 5, 5, SKIN);
-          ctx.fillStyle = SKIN;
-          ctx.beginPath(); ctx.arc(X + 41, Y + 4, 3.2, 0, Math.PI * 2); ctx.fill();
-          ctx.restore();
+          const img = duck ? frames.duck
+            : (this.jumping || Math.floor(Date.now() / 110) % 2 === 0) ? frames.a : frames.b;
+          if (!img || !img.complete || !img.naturalWidth) return;
+          if (duck) ctx.drawImage(img, this.xPos - 2, this.yPos + 16, 60, 30);
+          else ctx.drawImage(img, this.xPos - 3, this.yPos - 2, 48, 50);
         };
-        // The Runner painted the sprite dinosaur once during init, before this
-        // patch existed. Wipe and repaint so the FIRST visible frame is the
-        // ball-carrier, not the dino.
-        dino.clearCanvas();
-        try { dino.horizon.update(0, 0, true); } catch (e) {}
-        dino.tRex.draw(0, 0);
       }
+      // The Runner painted the sprite dinosaur once during init, before this
+      // patch existed. Wipe and repaint so the FIRST visible frame is the
+      // ball-carrier (repaints again the moment the SVG frames finish loading).
+      repaintIdle();
       armCrash();
       const isReal = S.run_index >= S.practice_runs;
       $("#runMsg").innerHTML = isReal
