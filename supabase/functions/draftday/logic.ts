@@ -146,11 +146,26 @@ export async function standings(comp: any) {
 }
 
 // Combine ranking: rank each event separately with that event's normal sort,
-// then average the positions. Raw scores are never mixed — the test is bounded
-// 0–30 and the runner is unbounded, so score-averaging would let the runner
-// swamp the test. A missed event scores last place in that event (finishers+1),
-// so skipping a weak event can't help. Both event ranks and the average are
-// returned so the group chat can audit the arithmetic.
+// then average the positions (raw scores are never mixed — the test is bounded
+// and the runner is unbounded). A missed event scores last place in that event.
+//
+// Ties on the average: compare the Dash final score AND the test completion
+// time. Better at BOTH wins the spot outright (a "sweep"). Split honors —
+// one better at each — go to a coin flip: deterministic per pair (hashed from
+// the competition + both players), so it is fair, unguessable, and identical
+// on every refresh. Flipped rows are flagged so the reveal can show it.
+function coinFlipWins(compId: string, aId: string, bId: string): boolean {
+  const [x, y] = [aId, bId].sort();
+  let h = 0x811c9dc5;
+  const str = compId + x + y;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  const xWins = (h % 2) === 0;
+  return aId === x ? xWins : !xWins;
+}
+
 async function combineStandings(comp: any) {
   const events = eventsFor(comp);
   const parts: any[] = await sql`
@@ -186,32 +201,57 @@ async function combineStandings(comp: any) {
 
   const scored = pool.map((p) => {
     const r = ranks.get(p.id)!;
-    const avg = events.reduce((s, ev) => s + r[ev], 0) / events.length;
-    const best = Math.min(...events.map((ev) => r[ev]));
-    const durations = events.map((ev) => byPart.get(p.id)?.[ev]?.duration_ms);
-    const totalDur = durations.reduce((s, d) => s + (d ?? 9e9), 0);
+    const avg = events.reduce((sum, ev) => sum + r[ev], 0) / events.length;
     const eventScores: Record<string, number | null> = {};
+    const eventDurations: Record<string, number | null> = {};
     for (const ev of events) {
       const a = byPart.get(p.id)?.[ev];
       eventScores[ev] = a ? Number(a.score) : null;
+      eventDurations[ev] = a ? a.duration_ms : null;
     }
-    return { p, avg, best, totalDur, event_ranks: r, event_scores: eventScores };
-  }).sort((a, b) =>
-    a.avg - b.avg || a.best - b.best || a.totalDur - b.totalDur ||
-    new Date(a.p.created_at).getTime() - new Date(b.p.created_at).getTime());
+    return {
+      p, avg,
+      dash: eventScores["trex"] ?? -1,                       // missing dash = worst
+      testDur: eventDurations["wonderlic"] ?? Infinity,      // missing test = slowest
+      event_ranks: r, event_scores: eventScores, event_durations: eventDurations,
+      coin_flip: false,
+    };
+  });
+
+  // Tie resolution within equal-average groups.
+  const cmp = (a: any, b: any): number => {
+    if (a.avg !== b.avg) return a.avg - b.avg;
+    const aSweeps = a.dash > b.dash && a.testDur < b.testDur;
+    const bSweeps = b.dash > a.dash && b.testDur < a.testDur;
+    if (aSweeps) return -1;
+    if (bSweeps) return 1;
+    return coinFlipWins(comp.id, a.p.id, b.p.id) ? -1 : 1;
+  };
+  scored.sort(cmp);
+  // Flag adjacencies that a coin flip decided (equal avg, no sweep either way).
+  for (let i = 0; i + 1 < scored.length; i++) {
+    const a = scored[i], b = scored[i + 1];
+    if (a.avg === b.avg) {
+      const sweep = (a.dash > b.dash && a.testDur < b.testDur) || (b.dash > a.dash && b.testDur < a.testDur);
+      if (!sweep) { a.coin_flip = true; b.coin_flip = true; }
+    }
+  }
 
   const dnfs = parts.filter((p) => p.is_dnf);
   const rows: any[] = [];
-  scored.forEach((s, i) => rows.push({
+  scored.forEach((sr, i) => rows.push({
     rank: i + 1,
-    name: s.p.display_name,
-    real_name: s.p.real_name,
+    name: sr.p.display_name,
+    real_name: sr.p.real_name,
     dnf: false,
-    placeholder: s.p.is_placeholder,
-    score: Math.round(s.avg * 10) / 10,
-    duration_ms: s.totalDur >= 9e9 ? null : s.totalDur,
-    event_ranks: s.event_ranks,
-    event_scores: s.event_scores,
+    placeholder: sr.p.is_placeholder,
+    score: Math.round(sr.avg * 10) / 10,
+    duration_ms: null,
+    avg: Math.round(sr.avg * 10) / 10,
+    event_ranks: sr.event_ranks,
+    event_scores: sr.event_scores,
+    event_durations: sr.event_durations,
+    coin_flip: sr.coin_flip,
   }));
   dnfs.forEach((p, i) => rows.push({
     rank: scored.length + i + 1,

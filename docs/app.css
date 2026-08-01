@@ -118,6 +118,25 @@ label { display: block; font-size: 13px; color: var(--dim); text-transform: uppe
 .slot.dnf { opacity: .55 !important; }
 .slot.dnf .nm { color: var(--dim); }
 
+/* ---- combine per-event stats + coin-flip tiebreak ---- */
+.ev-stats { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-variant-numeric: tabular-nums; }
+.ev-stats span { font-size: 13px; color: var(--text); white-space: nowrap; }
+.ev-stats b { font-family: "Oswald", sans-serif; font-weight: 600; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin-right: 5px; }
+.flip-note { color: var(--accent); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; font-size: 11px; }
+.slot { position: relative; }
+.slot .coin {
+  position: absolute; top: -9px; right: -6px; width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center; font-size: 17px;
+  filter: drop-shadow(0 2px 5px rgba(0,0,0,.5)); opacity: 0;
+}
+.slot.on.flip .coin { animation: coinflip 1.5s ease-out .15s forwards; }
+@keyframes coinflip {
+  0%   { opacity: 0; transform: translateY(-16px) rotateY(0deg) scale(.6); }
+  15%  { opacity: 1; }
+  70%  { transform: translateY(0) rotateY(900deg) scale(1.15); }
+  100% { opacity: 1; transform: translateY(0) rotateY(1080deg) scale(1); }
+}
+
 .bignum { font-family: "Anton", sans-serif; font-size: 84px; font-weight: 400; color: var(--accent); line-height: 1; }
 .center { text-align: center; }
 

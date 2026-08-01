@@ -1,7 +1,7 @@
 "use strict";
 /* Draft Order Competition — SPA. API lives on a Supabase Edge Function. */
 const API = "https://bwxsuybqhgocmwncxzlz.supabase.co/functions/v1/draftday";
-const APP_VERSION = 24;
+const APP_VERSION = 25;
 
 /* Stale-cache self-heal: if the server says a newer frontend exists, reload
    once with a cache-busting query. Guarded so it can never loop. */
@@ -68,14 +68,33 @@ function addTimer(t) { timers.push(t); }
 function clearTimers() { timers.forEach(clearInterval); timers = []; }
 
 /* ================= shared row builders ================= */
+const fmtAvg = (v) => Number(v).toFixed(1);
+
+// Per-event stat lines for a combine row: what actually happened in each
+// event, instead of one meaningless averaged number.
+function combineStatsHtml(r) {
+  const t = r.event_scores.wonderlic, d = r.event_scores.trex;
+  return '<span class="ev-stats">' +
+    '<span><b>Test</b> ' + (t == null ? "\u2014" : t + "/30 \u00b7 " + fmtDur(r.event_durations.wonderlic)) + "</span>" +
+    '<span><b>Dash</b> ' + (d == null ? "\u2014" : d) + "</span></span>";
+}
+
+function combineMetaHtml(r) {
+  return "Test #" + r.event_ranks.wonderlic + " \u00b7 Dash #" + r.event_ranks.trex +
+    " \u2192 avg place " + fmtAvg(r.avg != null ? r.avg : r.score) +
+    (r.coin_flip ? ' \u00b7 <span class="flip-note">coin flip</span>' : "");
+}
+
 function lbRowsHtml(rows, showScore) {
   return rows.map((r) =>
     '<div class="lb-row' + (r.rank === 1 ? " top" : "") + '"><span class="rk">' + r.rank + "</span>" +
     '<span class="nm">' + esc(r.name) +
       (r.real_name ? '<span class="rn">' + esc(r.real_name) + "</span>" : "") +
-      (r.event_ranks ? '<span class="rn">Test #' + r.event_ranks.wonderlic + " \u00b7 Dash #" + r.event_ranks.trex + " \u2192 avg " + r.score + "</span>" : "") + "</span>" +
+      (r.event_ranks ? '<span class="rn">' + combineMetaHtml(r) + "</span>" : "") + "</span>" +
     (showScore && r.score != null
-      ? '<span class="sc">' + r.score + '</span><span class="tm">' + fmtDur(r.duration_ms) + "</span>"
+      ? (r.event_scores
+          ? combineStatsHtml(r)
+          : '<span class="sc">' + r.score + '</span><span class="tm">' + fmtDur(r.duration_ms) + "</span>")
       : "") +
     "</div>"
   ).join("");
@@ -399,13 +418,21 @@ function renderReveal(el, standings, opts) {
     '<button class="btn ghost small" id="skipBtn">Skip</button></div>' +
     '<div id="slots">' +
     standings.map((r) =>
-      '<div class="slot' + (r.rank === 1 ? " first" : "") + (r.dnf ? " dnf" : "") + '" data-rank="' + r.rank + '">' +
+      '<div class="slot' + (r.rank === 1 ? " first" : "") + (r.dnf ? " dnf" : "") + (r.coin_flip ? " flip" : "") + '" data-rank="' + r.rank + '">' +
         '<div class="rank">' + r.rank + "</div>" +
         '<div class="who"><div class="nm">' + esc(r.name) + "</div>" +
         '<div class="meta">' + (r.dnf ? "DNF" : r.rank === 1 ? "First overall pick" : "Pick " + r.rank) +
-          (r.event_ranks ? " \u00b7 Test #" + r.event_ranks.wonderlic + " \u00b7 Dash #" + r.event_ranks.trex + " \u00b7 avg " + r.score : "") + "</div></div>" +
+          (r.event_ranks ? " \u00b7 " + combineMetaHtml(r) : "") + "</div></div>" +
         (showScore && !r.dnf
-          ? '<div class="pts"><div class="s">' + r.score + '</div><div class="t">' + fmtDur(r.duration_ms) + "</div></div>"
+          ? (r.event_scores
+              ? '<div class="pts">' + combineStatsHtml(r) + "</div>"
+              : '<div class="pts"><div class="s">' + r.score + '</div><div class="t">' + fmtDur(r.duration_ms) + "</div></div>")
+          : "") +
+        (r.coin_flip
+          ? '<div class="coin" aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24">' +
+            '<circle cx="12" cy="12" r="11" fill="#FFB01F" stroke="#8a5d0a" stroke-width="1.5"/>' +
+            '<circle cx="12" cy="12" r="7.5" fill="none" stroke="#8a5d0a" stroke-width="1.2"/>' +
+            '<path d="M12 8.2l1.1 2.3 2.5.3-1.85 1.7.5 2.5L12 13.7 9.75 15l.5-2.5-1.85-1.7 2.5-.3z" fill="#8a5d0a"/></svg></div>'
           : "") +
       "</div>"
     ).join("") +
@@ -872,7 +899,7 @@ function memberView(TOKEN) {
           '<div class="row" style="justify-content:center;gap:30px;margin-top:10px">' +
           S.result.events.map((e) =>
             '<div class="center"><div class="bignum" style="font-size:54px">' + e.score + "</div>" +
-            '<div class="mut">' + (e.key === "wonderlic" ? "Test /30" : "The Dash") + "</div></div>").join("") +
+            '<div class="mut">' + (e.key === "wonderlic" ? "Test /30 · " + fmtDur(e.duration_ms) : "The Dash") + "</div></div>").join("") +
           '</div><div class="sub">both events complete</div></div>'
         : '<div class="card"><div class="mut">Your score</div>' +
           '<div class="bignum">' + S.result.score + (S.result.total ? '<span style="color:var(--dim);font-size:40px">/' + S.result.total + "</span>" : "") + "</div>" +
@@ -903,7 +930,14 @@ function memberView(TOKEN) {
       app().innerHTML =
         '<div class="fade-in" style="text-align:left"><div class="kicker">' + esc(L.name) + '</div>' +
         "<h1>The results are in</h1>" +
-        (S.result ? '<div class="sub">You scored ' + S.result.score + (S.result.total ? "/" + S.result.total : "") + " in " + fmtDur(S.result.duration_ms) + ".</div>" : "") +
+        (S.result
+          ? (S.result.events
+              ? '<div class="sub">Your combine: ' + S.result.events.map((e) =>
+                  e.key === "wonderlic"
+                    ? "Test " + e.score + "/30 in " + fmtDur(e.duration_ms)
+                    : "Dash " + e.score).join(" · ") + ".</div>"
+              : '<div class="sub">You scored ' + S.result.score + (S.result.total ? "/" + S.result.total : "") + " in " + fmtDur(S.result.duration_ms) + ".</div>")
+          : "") +
         '<div id="reveal"></div>' + missedCardHtml(S) + ctaCardHtml(true) + "</div>";
       renderReveal($("#reveal"), S.standings, { showScore: S.type !== "random_order", shareUrl: S.results_url });
       wireCta(TOKEN);
@@ -968,7 +1002,7 @@ async function resultsView(TOKEN) {
   clearTimers();
   if (!r.visible) {
     // Not final yet: live standings that keep updating until the reveal.
-    const showScore = r.type === "wonderlic";
+    const showScore = r.type !== "random_order";
     const rows = (r.standings || []).filter((s) => !s.dnf);
     app().innerHTML =
       '<div style="text-align:left"><div class="kicker">' + esc(r.league_name) + '</div>' +
@@ -983,7 +1017,7 @@ async function resultsView(TOKEN) {
   app().innerHTML =
     '<div style="text-align:left"><div class="kicker">' + esc(r.league_name) + '</div><h1>Official Draft Order</h1>' +
     '<div id="reveal"></div></div>';
-  renderReveal($("#reveal"), r.standings, { showScore: r.type === "wonderlic", shareUrl: location.href });
+  renderReveal($("#reveal"), r.standings, { showScore: r.type !== "random_order", shareUrl: location.href });
 }
 
 /* ================= admin ================= */
