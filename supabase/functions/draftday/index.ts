@@ -493,14 +493,27 @@ app.post("/api/admin/competitions", async (c) => {
     : { max_attempts: 1 };
   // Draw this competition's 30 questions from the big bank — stratified so
   // every test gets a mix of verbal, numeric, and reasoning items.
+  // Percentage math is capped at 2 per test: it's slow to do mentally and the
+  // easiest category to cheat with a calculator. (Existing competitions are
+  // unaffected — their 30 questions are pinned by id at creation.)
   if (type === "wonderlic" || type === "combine") {
     const pick = async (cats: string[], n: number) =>
       (await sql`
         select id from questions where bank_version = 3 and category = any(${cats})
         order by random() limit ${n}`).map((r: any) => r.id);
+    const percentQs = (await sql`
+      select id from questions where bank_version = 3 and category = 'arithmetic'
+        and position('%' in prompt) > 0
+      order by random() limit 2`).map((r: any) => r.id);
+    const otherNumeric = (await sql`
+      select id from questions where bank_version = 3
+        and (category = 'number_series'
+             or (category = 'arithmetic' and position('%' in prompt) = 0))
+      order by random() limit ${10 - percentQs.length}`).map((r: any) => r.id);
     config.question_ids = [
       ...(await pick(["analogy", "word_relation"], 10)),
-      ...(await pick(["arithmetic", "number_series"], 10)),
+      ...percentQs,
+      ...otherNumeric,
       ...(await pick(["logic", "calendar", "pattern"], 10)),
     ];
   }
