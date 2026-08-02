@@ -1,7 +1,7 @@
 "use strict";
 /* Draft Order Competition — SPA. API lives on a Supabase Edge Function. */
 const API = "https://bwxsuybqhgocmwncxzlz.supabase.co/functions/v1/draftday";
-const APP_VERSION = 25;
+const APP_VERSION = 26;
 
 /* Stale-cache self-heal: if the server says a newer frontend exists, reload
    once with a cache-busting query. Guarded so it can never loop. */
@@ -1039,8 +1039,9 @@ function renderLogin(error, mode) {
   wrap().classList.remove("wide");
   app().innerHTML = `
     <div class="center" style="padding-top:30px">
+      <img src="./brand/icon.svg?v=26" alt="" style="width:54px;height:54px;margin-bottom:10px">
       <div class="kicker">Commissioner HQ</div>
-      <h1>Draft Order<br>Competition</h1>
+      <h1>The Proving<br>Ground</h1>
     </div>
     <div class="card" style="text-align:left">
       <h2>${isLogin ? "Log in" : "Create account"}</h2>
