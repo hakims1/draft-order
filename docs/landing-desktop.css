@@ -1,0 +1,86 @@
+/* landing-desktop.css — desktop hero refinement (≥1100px only).
+   Load AFTER landing.css. Mobile and tablet are untouched.
+   Pairs with the .lp-hpicks markup block added to the hero in index.html. */
+
+/* The challenge cards are desktop-only chrome; the mobile hero keeps its own clock. */
+.lp-hpicks{display:none}
+
+@media (min-width:1100px){
+
+  /* ---------- hero frame ---------- */
+  /* position:relative so the absolutely-positioned .lp-stagepic below anchors to
+     the hero, not to #landing (the nearest positioned ancestor otherwise). */
+  .lp-hero{padding-bottom:0; position:relative}
+  .lp-hero .lp-shell{
+    flex:1 0 auto;                 /* never shrink under its own content */
+    width:100%;
+    display:grid;
+    grid-template-columns:1.04fr .96fr;
+    grid-template-rows:auto 1fr;
+    column-gap:76px;
+    row-gap:40px;
+    align-items:center;
+    padding-bottom:64px;
+  }
+  .lp-nav{grid-column:1/-1; grid-row:1; padding:22px 0 20px; border-bottom:1px solid rgba(30,41,66,.9)}
+
+  /* left column back to a normal stack (base landing.css uses display:contents here) */
+  .lp-herobody{display:flex; grid-column:1; grid-row:2; padding:0}
+
+  /* headline: sized to the column instead of filling it */
+  .lp-hero h1{font-size:clamp(92px,8.4vw,132px); line-height:.86}
+  .lp-hero .lp-sub{max-width:40ch; font-size:20px; margin-top:26px}
+
+  /* the desktop hero reads the clock off the board panel */
+  .lp-hero .lp-clockwrap{display:none}
+
+  /* CTAs sit under the copy, side by side, where the eye lands */
+  .lp-heroCta{
+    display:flex; flex-direction:row; flex-wrap:wrap; align-items:center;
+    gap:12px; margin-top:36px; max-width:none;
+  }
+  .lp-heroCta .lp-btn{width:auto; min-width:210px; margin-top:0}
+  .lp-heroCta .lp-btn.lp-outline{min-width:238px}
+  .lp-heroCta .lp-sendline{flex:1 0 100%; margin-top:6px}
+
+  /* ---------- right column: the two challenges ---------- */
+  .lp-hpicks{
+    display:grid;
+    grid-column:2; grid-row:2; justify-self:end; align-self:center;
+    position:relative; z-index:2; display:grid; gap:16px;
+    width:100%; max-width:520px;
+  }
+  .lp-hpick{
+    display:block; position:relative; overflow:hidden;
+    background:linear-gradient(180deg,#111B31,#0B1120);
+    border:1px solid var(--line); border-left:2px solid var(--brass2); border-radius:2px;
+    box-shadow:0 30px 70px -34px rgba(0,0,0,.9);
+    transition:border-color .18s, transform .18s, box-shadow .18s;
+  }
+  .lp-hpick:hover{
+    border-color:var(--brass); border-left-color:var(--brass);
+    transform:translateY(-2px);
+    box-shadow:0 36px 80px -34px rgba(0,0,0,.9), 0 0 60px -34px rgba(255,176,31,.5);
+  }
+  .lp-hp-art{
+    height:132px; background:
+      radial-gradient(120% 100% at 78% 0%, rgba(255,176,31,.1), transparent 62%),
+      linear-gradient(180deg,#152039,#0D1424);
+    border-bottom:1px solid var(--line); display:grid; place-items:center; padding:10px 18px;
+  }
+  .lp-hp-art svg{width:100%; height:100%; max-height:112px}
+  .lp-hp-txt{padding:16px 20px 18px}
+  .lp-hp-eye{font-family:var(--cond); font-weight:500; text-transform:uppercase;
+    letter-spacing:.22em; font-size:10.5px; color:var(--brass)}
+  .lp-hero .lp-hp-name{
+    font-family:var(--disp); font-weight:400; text-transform:uppercase;
+    font-size:30px; line-height:1; letter-spacing:.01em; color:var(--text); margin-top:8px;
+  }
+  .lp-hp-desc{font-family:var(--sys); font-size:14.5px; line-height:1.5; color:var(--dim); margin-top:7px; text-wrap:pretty}
+
+  /* stage art demoted to ambience behind the cards */
+  .lp-hero .lp-stagepic{
+    position:absolute; z-index:0; right:-40px; bottom:-30px;
+    width:660px; max-width:none; margin:0; opacity:.2; pointer-events:none;
+  }
+}

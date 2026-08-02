@@ -8,12 +8,13 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- app.css must be the FIRST stylesheet: the embedded t-rex game injects
      keyframes into document.styleSheets[0], which throws on cross-origin sheets. -->
-<link rel="stylesheet" href="./app.css?v=28">
+<link rel="stylesheet" href="./app.css?v=29">
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./landing.css?v=28">
-<link rel="icon" type="image/svg+xml" href="./brand/favicon.svg?v=28">
-<link rel="icon" type="image/png" sizes="32x32" href="./brand/favicon-32.png?v=28">
-<link rel="apple-touch-icon" href="./brand/apple-touch-icon.png?v=28">
+<link rel="stylesheet" href="./landing.css?v=29">
+<link rel="stylesheet" href="./landing-desktop.css?v=29">
+<link rel="icon" type="image/svg+xml" href="./brand/favicon.svg?v=29">
+<link rel="icon" type="image/png" sizes="32x32" href="./brand/favicon-32.png?v=29">
+<link rel="apple-touch-icon" href="./brand/apple-touch-icon.png?v=29">
 </head>
 <body>
 <div class="wrap" id="wrap">
@@ -38,7 +39,7 @@
 
   <div class="lp-shell">
     <nav class="lp-nav">
-      <div class="lp-logo"><img class="lp-lm" src="./brand/icon.svg?v=28" alt=""><b><i>The</i> Proving Ground</b></div>
+      <div class="lp-logo"><img class="lp-lm" src="./brand/icon.svg?v=29" alt=""><b><i>The</i> Proving Ground</b></div>
       <div style="display:flex;align-items:center;gap:12px;flex-shrink:0">
         <a class="lp-navlink" href="#/login">Log in</a>
         <a class="lp-navlink" href="#/admin/signup" style="color:var(--brass)">Get started</a>
@@ -51,7 +52,7 @@
         <div class="lp-clocklab">One test<br>Six minutes<br>One try</div>
       </div>
       <h1>Earn<br><em>your pick</em></h1>
-      <p class="lp-body lp-sub">Your league takes one 6 minute test. Highest score gets to pick their position first. Nobody gets handed the top pick this year without earning it.</p>
+      <p class="lp-body lp-sub">Your league competes in a basic test of wit or skill to determine draft order priority. Nobody gets handed the top pick this year without earning it.</p>
       <div class="lp-heroCta">
         <a class="lp-btn" id="getStarted" href="#/admin/signup">Get started</a>
         <button class="lp-btn lp-outline" type="button" data-jump="#test" style="margin-top:10px">Try the 60 second version</button>
@@ -60,6 +61,27 @@
           Already sold? <u>Send it to your league</u>
         </button>
       </div>
+    </div>
+
+
+
+    <div class="lp-hpicks">
+      <a class="lp-hpick" href="#/admin/signup">
+        <div class="lp-hp-art"><svg viewBox="0 0 300 150" preserveAspectRatio="xMidYMax meet" aria-hidden="true"><g stroke="#8C7231" stroke-width="3" stroke-linecap="round" opacity=".45"><path d="M10 44 H52 M4 62 H40 M14 80 H46"/></g><circle cx="268" cy="26" r="10" fill="#FFB01F" opacity=".9"/><g transform="translate(96 132) scale(1)" stroke="#3DDC84" stroke-linecap="round" fill="none"><path d="M0 0 V-40" stroke-width="9"/><path d="M0 -12 C-13 -12 -15 -18 -15 -27" stroke-width="7"/><path d="M0 -22 C13 -22 15 -28 15 -37" stroke-width="7"/></g><g transform="translate(240 132) scale(0.72)" stroke="#3DDC84" stroke-linecap="round" fill="none"><path d="M0 0 V-40" stroke-width="9"/><path d="M0 -12 C-13 -12 -15 -18 -15 -27" stroke-width="7"/><path d="M0 -22 C13 -22 15 -28 15 -37" stroke-width="7"/></g><g transform="translate(116 22) scale(1.02)"><polyline points="42,58 26,70 16,86" fill="none" stroke="#101319" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/><polyline points="42,58 26,70 16,86" fill="none" stroke="#EDEFF5" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><polyline points="18,82 16,88" fill="none" stroke="#101319" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/><polyline points="18,82 16,88" fill="none" stroke="#FFB01F" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><rect x="2" y="86" width="19" height="8" rx="3" transform="rotate(8 2 86)" fill="#20242E" stroke="#101319" stroke-width="2.5"/><polyline points="46,58 64,62 58,78" fill="none" stroke="#101319" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/><polyline points="46,58 64,62 58,78" fill="none" stroke="#EDEFF5" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><polyline points="60,72 58,79" fill="none" stroke="#101319" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/><polyline points="60,72 58,79" fill="none" stroke="#FFB01F" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><rect x="52" y="78" width="20" height="8" rx="3" fill="#20242E" stroke="#101319" stroke-width="2.5"/><path d="M38 34 Q44 24 58 24 Q70 26 68 36 L62 60 Q50 66 40 60 Z" fill="#1E2942" stroke="#101319" stroke-width="3"/><rect x="44" y="38" width="16" height="4.5" rx="2" fill="#FFB01F"/><rect x="46" y="46" width="12" height="4" rx="2" fill="#FFB01F"/><polyline points="52,34 42,46" fill="none" stroke="#101319" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/><polyline points="52,34 42,46" fill="none" stroke="#8A5A2B" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><ellipse cx="52" cy="50" rx="14" ry="8.5" transform="rotate(-18 52 50)" fill="#7B4222" stroke="#101319" stroke-width="2.5"/><path d="M42 52 L62 45" stroke="#EDEFF5" stroke-width="2"/><path d="M49 50 l2 -1 M53 48.6 l2 -1 M57 47.2 l2 -1" stroke="#EDEFF5" stroke-width="1.4"/><polyline points="42,46 56,54" fill="none" stroke="#101319" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><polyline points="42,46 56,54" fill="none" stroke="#8A5A2B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="66" cy="16" r="13.5" fill="#1E2942" stroke="#101319" stroke-width="3"/><path d="M56 6 A13.5 13.5 0 0 1 76 6.5" fill="none" stroke="#FFB01F" stroke-width="4.5"/><rect x="70" y="12" width="9.5" height="11" rx="3" fill="#8A5A2B" stroke="#101319" stroke-width="2"/><circle cx="75" cy="16" r="1.4" fill="#101319"/><path d="M74 14 L90 11 M74 19 L89 17 M87 10 L88 18" fill="none" stroke="#97A1B4" stroke-width="2.6" stroke-linecap="round"/><circle cx="63" cy="17" r="2" fill="#101319" opacity=".55"/><polyline points="60,32 78,24 90,12" fill="none" stroke="#101319" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/><polyline points="60,32 78,24 90,12" fill="none" stroke="#8A5A2B" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M88 8 l4 -4 M92 10 l5 -3 M94 14 l5 -1" stroke="#101319" stroke-width="5.5" stroke-linecap="round"/><path d="M88 8 l4 -4 M92 10 l5 -3 M94 14 l5 -1" stroke="#8A5A2B" stroke-width="3" stroke-linecap="round"/></g><path d="M0 132 H300" stroke="#8B94A9" stroke-width="2.5" stroke-dasharray="7 6" opacity=".8"/></svg></div>
+        <div class="lp-hp-txt">
+          <div class="lp-hp-eye">Challenge 01 · Reflex</div>
+          <h2 class="lp-hp-name">The 2D Yard Dash</h2>
+          <p class="lp-hp-desc">Jump the cacti. 3 practice runs, then one run that counts.</p>
+        </div>
+      </a>
+      <a class="lp-hpick" href="#/admin/signup">
+        <div class="lp-hp-art"><svg viewBox="0 0 300 150" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><rect x="16" y="10" width="168" height="130" rx="5" fill="#EDEFF5"/><path d="M34 30h96M34 44h124M34 58h108" stroke="#8B94A9" stroke-width="5" stroke-linecap="round"/><g stroke="#8B94A9" stroke-width="3.4" fill="none"><circle cx="42" cy="86" r="9"/><circle cx="72" cy="86" r="9"/><circle cx="102" cy="86" r="9"/><circle cx="132" cy="86" r="9"/><circle cx="42" cy="116" r="9"/><circle cx="72" cy="116" r="9"/><circle cx="102" cy="116" r="9"/><circle cx="132" cy="116" r="9"/></g><g fill="#FFB01F"><circle cx="72" cy="86" r="9"/><circle cx="132" cy="116" r="9"/></g><circle cx="42" cy="86" r="9" fill="none" stroke="#3DDC84" stroke-width="3.4"/><circle cx="236" cy="70" r="46" fill="none" stroke="#FFB01F" stroke-width="7"/><path d="M236 42 v28 l19 13" stroke="#FFB01F" stroke-width="6.5" stroke-linecap="round" fill="none"/><text x="236" y="142" text-anchor="middle" font-family="ui-monospace,Menlo,monospace" font-size="21" font-weight="600" fill="#FFB01F" letter-spacing="1">6:00</text></svg></div>
+        <div class="lp-hp-txt">
+          <div class="lp-hp-eye">Challenge 02 · Wits</div>
+          <h2 class="lp-hp-name">Wonderlic-Style Test</h2>
+          <p class="lp-hp-desc">30 questions, 6:00 on the clock, one try. Highest score picks first.</p>
+        </div>
+      </a>
     </div>
 
     <div class="lp-stagepic" aria-hidden="true">
@@ -374,11 +396,11 @@
 
 <footer>
   <div class="lp-shell">
-    <div class="lp-fl"><img src="./brand/icon.svg?v=28" alt="">The Proving Ground</div>
+    <div class="lp-fl"><img src="./brand/icon.svg?v=29" alt="">The Proving Ground</div>
     <p>Not affiliated with, endorsed by, or connected to any professional football league, team, or broadcaster.</p>
   </div>
 </footer>
 </div>
-<script src="./app.js?v=28"></script>
+<script src="./app.js?v=29"></script>
 </body>
 </html>
