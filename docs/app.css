@@ -252,7 +252,13 @@ a { color: var(--accent); }
   background: var(--panel2); border: 2px solid var(--line); border-radius: 14px;
   padding: 16px 14px 14px; color: var(--text); transition: border-color .15s, opacity .15s;
 }
-.gtype .gt-ic { width: 72px; height: 48px; display: block; margin-bottom: 10px; }
+.gtype .gt-ic {
+  width: 100%; height: auto; display: block; margin-bottom: 12px;
+  padding: 10px 14px; border-radius: 9px; border: 1px solid var(--line);
+  background:
+    radial-gradient(120% 100% at 78% 0%, rgba(255,176,31,.1), transparent 62%),
+    linear-gradient(180deg, #10192e, #0b1120);
+}
 .gtype b {
   display: block; font-family: "Oswald", sans-serif; font-weight: 600;
   text-transform: uppercase; letter-spacing: 1px; font-size: 17px;
