@@ -1,7 +1,7 @@
 "use strict";
 /* Draft Order Competition — SPA. API lives on a Supabase Edge Function. */
 const API = "https://bwxsuybqhgocmwncxzlz.supabase.co/functions/v1/draftday";
-const APP_VERSION = 26;
+const APP_VERSION = 27;
 
 /* Stale-cache self-heal: if the server says a newer frontend exists, reload
    once with a cache-busting query. Guarded so it can never loop. */
@@ -23,7 +23,7 @@ let landingWired = false;
 /* Display names only — the enum values in the DB/API are unchanged. */
 const TYPE_NAME = (t) =>
   t === "wonderlic" ? "Draft Day Aptitude Test"
-  : t === "trex" ? "The Dash"
+  : t === "trex" ? "The 2D Yard Dash"
   : t === "combine" ? "Skill & Wit Combine"
   : "Random Order";
 
@@ -39,14 +39,14 @@ const MSGS_DRAW = [
   "draft order draw is happening on this link. lock your name in, order gets drawn once everyone's in, everybody sees it live. ten seconds"
 ];
 const MSGS_TREX = [
-  "Yooooo\n\ndraft order this year = The Dash. run, jump, don't crash\n\neveryone gets 3 practice runs then 1 run that counts. highest score picks first, last place lives with it\n\ntakes five minutes on your phone, link below",
-  "new rule for this year\n\nno hat, no randomizer. draft order is decided by The Dash\n\n3 practice runs, then 1 real one. highest score picks first, last place picks last\n\nwarm up first. you'll need it",
-  "draft order = The Dash this year. 3 practice runs, 1 that counts, highest score picks first. five minutes on your phone, link below"
+  "Yooooo\n\ndraft order this year = The 2D Yard Dash. run, jump, don't crash\n\neveryone gets 3 practice runs then 1 run that counts. highest score picks first, last place lives with it\n\ntakes five minutes on your phone, link below",
+  "new rule for this year\n\nno hat, no randomizer. draft order is decided by The 2D Yard Dash\n\n3 practice runs, then 1 real one. highest score picks first, last place picks last\n\nwarm up first. you'll need it",
+  "draft order = The 2D Yard Dash this year. 3 practice runs, 1 that counts, highest score picks first. five minutes on your phone, link below"
 ];
 const MSGS_COMBINE = [
-  "Yooooo\n\ndraft order this year is a full COMBINE. two events\n\nevent 1: a 6 minute test. event 2: The Dash. your positions in both get averaged \u2014 best combined finish picks first\n\nno hiding behind one skill. link below",
-  "new rule for this year\n\ntwo events, one draft order. the 6 minute test, then The Dash. positions averaged, lowest combined rank picks first\n\nyou need wits AND thumbs. no re-rolls",
-  "draft order = a two-event combine. test + The Dash, positions averaged, best combined finish picks first. link below"
+  "Yooooo\n\ndraft order this year is a full COMBINE. two events\n\nevent 1: a 6 minute test. event 2: The 2D Yard Dash. your positions in both get averaged \u2014 best combined finish picks first\n\nno hiding behind one skill. link below",
+  "new rule for this year\n\ntwo events, one draft order. the 6 minute test, then The 2D Yard Dash. positions averaged, lowest combined rank picks first\n\nyou need wits AND thumbs. no re-rolls",
+  "draft order = a two-event combine. test + The 2D Yard Dash, positions averaged, best combined finish picks first. link below"
 ];
 const wrap = () => document.getElementById("wrap");
 const $ = (s, el) => (el || document).querySelector(s);
@@ -285,7 +285,7 @@ function wireCta(shareToken) {
 }
 
 
-/* "The Dash" character: an original outlined-cartoon running back in the
+/* "The 2D Yard Dash" character: an original outlined-cartoon running back in the
    classic ball-carrier pose — ball tucked, stiff-arm extended, knees driving.
    Drawn as SVG and rendered into the game canvas as real artwork. */
 function dashFrameSvg(pose) {
@@ -677,7 +677,7 @@ function memberView(TOKEN) {
     lastPhase = "game";
     app().innerHTML =
       '<div class="game-screen" style="text-align:left"><div><div class="kicker">' + esc(S.league.name) + '</div>' +
-      '<h1 style="font-size:30px">The Dash</h1>' +
+      '<h1 style="font-size:30px">The 2D Yard Dash</h1>' +
       '<div id="gameHead">' + gameHeader() + "</div></div>" +
       '<div class="trex-stage"><div id="trexCont"></div></div>' +
       '<div class="card"><div class="sub" id="runMsg">Loading the game&hellip;</div>' +
@@ -705,7 +705,7 @@ function memberView(TOKEN) {
       if (window.__dino && window.__dino.stopListening) { try { window.__dino.stopListening(); } catch (e) {} }
       Runner.instance_ = null;
       dino = window.__dino = new Runner("#trexCont");
-      // "The Dash": outlined-cartoon ball-carrier frames, drawn as SVG art.
+      // "The 2D Yard Dash": outlined-cartoon ball-carrier frames, drawn as SVG art.
       const repaintIdle = () => {
         if (!dino || dino.playing) return;
         try { dino.clearCanvas(); dino.horizon.update(0, 0, true); dino.tRex.draw(0, 0); } catch (e) {}
@@ -758,7 +758,7 @@ function memberView(TOKEN) {
         "<h1>Event 1<br>Complete</h1>" +
         '<div class="card center"><div class="mut">Your test score</div>' +
         '<div class="bignum">' + (ev1.score ?? "&mdash;") + '<span style="color:var(--dim);font-size:40px">/30</span></div></div>' +
-        '<div class="card"><div class="row spread"><span class="tag red">Event 2 of 2</span><span class="mut">The Dash</span></div>' +
+        '<div class="card"><div class="row spread"><span class="tag red">Event 2 of 2</span><span class="mut">The 2D Yard Dash</span></div>' +
         '<div class="warnbox"><b>One sitting:</b> pressing start opens your Dash session &mdash; 3 practice runs, then the run that counts, with a 15:00 session limit.</div>' +
         '<button class="btn" id="goBtn">Start event 2</button></div></div>';
       $("#goBtn").onclick = async () => {
@@ -788,7 +788,7 @@ function memberView(TOKEN) {
         : isC
         ? '<div class="rules">' +
             '<div class="rule"><span class="ico">&#9670;</span><span><span class="gold">Event 1:</span> the aptitude test &mdash; 30 questions, 6:00</span></div>' +
-            '<div class="rule"><span class="ico">&#9670;</span><span><span class="gold">Event 2:</span> The Dash &mdash; 3 practice runs, 1 that counts</span></div>' +
+            '<div class="rule"><span class="ico">&#9670;</span><span><span class="gold">Event 2:</span> The 2D Yard Dash &mdash; 3 practice runs, 1 that counts</span></div>' +
             '<div class="rule"><span class="ico">&#9670;</span><span>Positions averaged &mdash; <span class="gold">lowest combined rank</span> picks first</span></div>' +
           "</div>"
         : '<div class="rules">' +
@@ -842,7 +842,7 @@ function memberView(TOKEN) {
             : isT
             ? '<div class="warnbox"><b>One sitting:</b> pressing the button starts your session &mdash; 3 practice runs, then the real one, back-to-back with a 15:00 session limit. One attempt only.</div>'
             : isC
-            ? '<div class="warnbox"><b>Heads up:</b> event 1 is the 6:00 test &mdash; its timer starts the instant you press the button and cannot be paused. The Dash follows as event 2. One attempt per event.</div>'
+            ? '<div class="warnbox"><b>Heads up:</b> event 1 is the 6:00 test &mdash; its timer starts the instant you press the button and cannot be paused. The 2D Yard Dash follows as event 2. One attempt per event.</div>'
             : "") +
           '<button class="btn" id="goBtn">' + (isW ? "Start the test" : isT ? "Start playing" : isC ? "Start event 1" : "Lock me in") + "</button>" +
           '<div class="err" id="joinErr"></div>' +
@@ -899,7 +899,7 @@ function memberView(TOKEN) {
           '<div class="row" style="justify-content:center;gap:30px;margin-top:10px">' +
           S.result.events.map((e) =>
             '<div class="center"><div class="bignum" style="font-size:54px">' + e.score + "</div>" +
-            '<div class="mut">' + (e.key === "wonderlic" ? "Test /30 · " + fmtDur(e.duration_ms) : "The Dash") + "</div></div>").join("") +
+            '<div class="mut">' + (e.key === "wonderlic" ? "Test /30 · " + fmtDur(e.duration_ms) : "The 2D Yard Dash") + "</div></div>").join("") +
           '</div><div class="sub">both events complete</div></div>'
         : '<div class="card"><div class="mut">Your score</div>' +
           '<div class="bignum">' + S.result.score + (S.result.total ? '<span style="color:var(--dim);font-size:40px">/' + S.result.total + "</span>" : "") + "</div>" +
@@ -1039,7 +1039,7 @@ function renderLogin(error, mode) {
   wrap().classList.remove("wide");
   app().innerHTML = `
     <div class="center" style="padding-top:30px">
-      <img src="./brand/icon.svg?v=26" alt="" style="width:54px;height:54px;margin-bottom:10px">
+      <img src="./brand/icon.svg?v=27" alt="" style="width:54px;height:54px;margin-bottom:10px">
       <div class="kicker">Commissioner HQ</div>
       <h1>The Proving<br>Ground</h1>
     </div>
@@ -1122,7 +1122,7 @@ async function adminHome() {
         </button>
         <button type="button" class="gtype" data-gt="trex">
           ${GT_ICONS.trex}
-          <b>Runner Game</b>
+          <b>The 2D Yard Dash</b>
           <span>Jump the cacti. 3 practice runs, then one run that counts.</span>
         </button>
         <button type="button" class="gtype" data-gt="combine">

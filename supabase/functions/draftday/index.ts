@@ -31,7 +31,7 @@ import { checkGate, hasEntitlement, isOwner, logEvent } from "./gates.ts";
 
 const FN = "draftday";
 // Bumped with every frontend release; stale clients hard-reload themselves.
-const APP_VERSION = 26;
+const APP_VERSION = 27;
 // Public site (GitHub Pages). Share/results URLs are built against this.
 const SITE = (Deno.env.get("SITE_ORIGIN") ?? "https://hakims1.github.io/draft-order/").replace(/\/?$/, "/");
 
@@ -283,7 +283,7 @@ app.post("/c/:token/start", async (c) => {
   return c.json(await memberState(c, comp));
 });
 
-// The Dash: record one run (practice or real). The final run finalizes the event.
+// The 2D Yard Dash: record one run (practice or real). The final run finalizes the event.
 app.post("/c/:token/run", async (c) => {
   const comp = await competitionByShareToken(c.req.param("token"));
   if (!comp) return c.json({ phase: "error", error: "Competition not found." }, 404);
