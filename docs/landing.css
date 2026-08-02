@@ -283,6 +283,44 @@ color:var(--text);
   .lp-thread{max-width:620px}
   .lp-sendsec .lp-btn{max-width:420px}
 }
+/* ---------- desktop (≥1100px) — layout only; mobile/tablet rules above are untouched ---------- */
+@media (min-width:1100px){
+  /* Hero: headline block left and bigger; stage art + CTAs right. */
+  .lp-hero .lp-shell{
+    flex:1; width:100%; display:grid;
+    grid-template-columns:1.08fr .92fr;
+    grid-template-rows:auto 1fr auto auto auto 1.15fr;
+    column-gap:72px;
+  }
+  .lp-nav{grid-column:1/-1; grid-row:1}
+  .lp-herobody{display:contents}
+  .lp-clockwrap{grid-column:1; grid-row:3; margin-bottom:34px}
+  .lp-hero h1{grid-column:1; grid-row:4; font-size:clamp(110px,10.2vw,164px)}
+  .lp-hero .lp-sub{grid-column:1; grid-row:5; max-width:44ch; font-size:20px; margin-top:28px}
+  .lp-stagepic{grid-column:2; grid-row:2/5; align-self:end; justify-self:end; margin:0; max-width:640px; width:100%}
+  .lp-heroCta{grid-column:2; grid-row:5; align-self:center; justify-self:end; width:100%; max-width:440px; margin-top:28px}
+
+  /* Sample test: section title left, live card right. */
+  #test .lp-shell{display:grid; grid-template-columns:.72fr 1.28fr; column-gap:72px; align-items:center}
+  #test .lp-kicker{align-self:end}
+  #test .lp-stitle{font-size:clamp(44px,4.2vw,58px); align-self:start}
+  #test .lp-test{grid-column:2; grid-row:1/4; margin:0; max-width:none}
+
+  /* Reveal: copy left (sticky), board right. */
+  #revealBoard{grid-column:2; grid-row:1/5; margin-top:0; max-width:760px; justify-self:end; width:100%}
+  .lp-sec:has(#revealBoard) .lp-shell{display:grid; grid-template-columns:.66fr 1.34fr; column-gap:72px}
+  .lp-sec:has(#revealBoard) .lp-kicker{margin-top:8px}
+
+  /* Send it: pitch + tone picker left, chat thread right. */
+  .lp-sendsec .lp-shell{display:grid; grid-template-columns:1fr 1.05fr; column-gap:72px; align-items:start}
+  .lp-sendsec .lp-thread{grid-column:2; grid-row:1/7; align-self:center; margin-top:0; max-width:560px; width:100%; justify-self:end}
+
+  /* Closing + footer breathing room */
+  .lp-closing h2{font-size:clamp(56px,5.4vw,84px)}
+  #landing footer .lp-shell{display:flex; align-items:center; justify-content:space-between; gap:20px}
+  #landing footer p{margin-top:0; text-align:right}
+}
+
 @media (prefers-reduced-motion:reduce){
   #landing *{animation:none !important; transition:none !important}
   .lp-card,.lp-plate{opacity:1 !important; transform:none !important}
