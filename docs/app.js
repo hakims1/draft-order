@@ -1,7 +1,26 @@
 "use strict";
 /* Draft Order Competition — SPA. API lives on a Supabase Edge Function. */
 const API = "https://bwxsuybqhgocmwncxzlz.supabase.co/functions/v1/draftday";
-const APP_VERSION = 30;
+const APP_VERSION = 31;
+
+/* Campaign attribution: links like theprovingground.app/?src=ig-bio tag the
+   visit. First touch is kept for signup attribution; every tagged landing
+   logs one click per browser session. */
+(() => {
+  try {
+    const src = (new URLSearchParams(location.search).get("src") || "").trim().slice(0, 64);
+    if (!src) return;
+    if (!localStorage.getItem("attrib_src")) localStorage.setItem("attrib_src", src);
+    if (sessionStorage.getItem("visit_logged") !== src) {
+      sessionStorage.setItem("visit_logged", src);
+      fetch(API + "/track", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ src }),
+      }).catch(() => {});
+    }
+  } catch { /* storage blocked — attribution is best-effort */ }
+})();
 
 /* Stale-cache self-heal: if the server says a newer frontend exists, reload
    once with a cache-busting query. Guarded so it can never loop. */
@@ -1038,7 +1057,10 @@ function renderLogin(error, mode) {
   $("#swap").onclick = (e) => { e.preventDefault(); renderLogin("", isLogin ? "signup" : "login"); };
   $("#authBtn").onclick = async () => {
     const body = { email: $("#em").value, password: $("#pw").value };
-    if (!isLogin) body.ref = localStorage.getItem("ref_share") || undefined;
+    if (!isLogin) {
+      body.ref = localStorage.getItem("ref_share") || undefined;
+      body.src = localStorage.getItem("attrib_src") || undefined;
+    }
     const r = await fetch(API + "/admin/" + (isLogin ? "login" : "signup"), {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
@@ -1337,7 +1359,6 @@ async function metricsView() {
     <h1>Business Metrics</h1>
     <div class="stats">
       ${stat(t.accounts, "Accounts")}
-      ${stat(t.leagues, "Leagues")}
       ${stat(t.competitions, "Competitions created")}
       ${stat(t.pending, "Pending (live)")}
       ${stat(t.completed, "Completed")}
@@ -1352,12 +1373,22 @@ async function metricsView() {
       ${stat(t.signups_via_cta, "Signups via CTA")}
     </div>
     <div class="card">
+      <h2>Traffic sources</h2>
+      ${(d.sources || []).length
+        ? '<table><thead><tr><th>Source</th><th>Clicks</th><th>Signups</th><th>Comps</th><th>Activated</th><th>Purchases</th></tr></thead><tbody>' +
+          d.sources.map((s) =>
+            "<tr><td>" + esc(s.src) + "</td><td>" + s.clicks + "</td><td>" + s.signups + "</td>" +
+            "<td>" + s.competitions + "</td><td>" + s.activated + "</td><td>" + s.purchases + "</td></tr>"
+          ).join("") + "</tbody></table>"
+        : '<div class="mut">No tagged traffic yet. Put <b>?src=ig-bio</b> (any label you like) on links you share — e.g. theprovingground.app/?src=ig-bio — and the funnel shows up here.</div>'}
+    </div>
+    <div class="card">
       <h2>Accounts</h2>
-      <table><thead><tr><th>Email</th><th>Joined</th><th>Leagues</th><th>Comps</th><th>Members</th><th>Finished</th></tr></thead>
+      <table><thead><tr><th>Email</th><th>Joined</th><th>Comps</th><th>Members</th><th>Finished</th></tr></thead>
       <tbody>${d.accounts.map((a) =>
         "<tr><td>" + esc(a.email) + "</td>" +
         "<td>" + new Date(a.created_at).toLocaleDateString() + "</td>" +
-        "<td>" + a.leagues + "</td><td>" + a.competitions + "</td>" +
+        "<td>" + a.competitions + "</td>" +
         "<td>" + a.members_joined + "</td><td>" + a.finished + "</td></tr>"
       ).join("")}</tbody></table>
     </div></div>`;

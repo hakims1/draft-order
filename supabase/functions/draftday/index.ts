@@ -31,7 +31,7 @@ import { checkGate, hasEntitlement, isOwner, logEvent } from "./gates.ts";
 
 const FN = "draftday";
 // Bumped with every frontend release; stale clients hard-reload themselves.
-const APP_VERSION = 30;
+const APP_VERSION = 31;
 // Public site (GitHub Pages). Share/results URLs are built against this.
 const SITE = (Deno.env.get("SITE_ORIGIN") ?? "https://hakims1.github.io/draft-order/").replace(/\/?$/, "/");
 
@@ -350,6 +350,13 @@ app.get("/r/:rtoken/data.json", async (c) => {
 const TRACKABLE = new Set(["cta_start_own_clicked"]);
 app.post("/track", async (c) => {
   const b = await c.req.json().catch(() => ({}));
+  // Campaign visits: the SPA pings {src} once per session when a URL carries
+  // ?src=... (e.g. theprovingground.app/?src=ig-bio). Top-of-funnel clicks.
+  const src = String(b.src ?? "").trim().slice(0, 64);
+  if (src && b.name === undefined) {
+    await logEvent("visit", { props: { src } });
+    return c.json({ ok: true });
+  }
   const name = String(b.name ?? "");
   if (!TRACKABLE.has(name)) return c.json({ ok: false });
   let competitionId: string | undefined;
@@ -370,7 +377,8 @@ async function requireAdmin(c: any) {
 }
 
 app.post("/admin/signup", async (c) => {
-  const { email: rawEmail, password, ref } = await c.req.json().catch(() => ({}));
+  const { email: rawEmail, password, ref, src: rawSrc } = await c.req.json().catch(() => ({}));
+  const src = String(rawSrc ?? "").trim().slice(0, 64);
   const email = String(rawEmail ?? "").trim().toLowerCase();
   if (!email.includes("@") || String(password ?? "").length < 8) {
     return c.json({ error: "Enter a valid email and a password of 8+ characters." });
@@ -386,7 +394,11 @@ app.post("/admin/signup", async (c) => {
     const refComp = await competitionByShareToken(ref);
     refCompId = refComp?.id;
   }
-  await logEvent("signup", { adminId: admin.id, competitionId: refCompId, props: { via_cta: !!refCompId } });
+  await logEvent("signup", {
+    adminId: admin.id,
+    competitionId: refCompId,
+    props: src ? { via_cta: !!refCompId, src } : { via_cta: !!refCompId },
+  });
   return c.json({ token: await createSession(admin.id) });
 });
 
@@ -462,7 +474,33 @@ app.get("/api/admin/metrics", async (c) => {
     group by a.id, a.email, a.created_at
     order by a.created_at desc`;
 
-  return c.json({ totals, accounts });
+  // Campaign funnel: for every ?src= tag, clicks (visit pings) → signups
+  // attributed to that source → what those accounts went on to do.
+  const sources = await sql`
+    with visits as (
+      select props->>'src' as src, count(*)::int as clicks
+      from events where name = 'visit' and props->>'src' is not null
+      group by 1),
+    cohort as (
+      select props->>'src' as src, admin_id
+      from events where name = 'signup' and props->>'src' is not null and admin_id is not null),
+    per_admin as (
+      select co.src, co.admin_id,
+        (select count(*)::int from competitions c where c.admin_id = co.admin_id) as comps,
+        (select count(*)::int from competitions c where c.admin_id = co.admin_id and c.status <> 'draft') as activated,
+        (select count(*)::int from events e where e.name = 'purchase_mock' and e.admin_id = co.admin_id) as purchases
+      from cohort co)
+    select coalesce(v.src, p.src) as src,
+      coalesce(max(v.clicks), 0)::int as clicks,
+      count(p.admin_id)::int as signups,
+      coalesce(sum(p.comps), 0)::int as competitions,
+      coalesce(sum(p.activated), 0)::int as activated,
+      coalesce(sum(p.purchases), 0)::int as purchases
+    from visits v full outer join per_admin p on p.src = v.src
+    group by coalesce(v.src, p.src)
+    order by 2 desc`;
+
+  return c.json({ totals, accounts, sources });
 });
 
 // One-step creation: game type + name + member count -> a draft competition.
