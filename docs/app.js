@@ -1,7 +1,7 @@
 "use strict";
 /* Draft Order Competition — SPA. API lives on a Supabase Edge Function. */
 const API = "https://bwxsuybqhgocmwncxzlz.supabase.co/functions/v1/draftday";
-const APP_VERSION = 34;
+const APP_VERSION = 35;
 
 /* Campaign attribution: links like theprovingground.app/?src=ig-bio tag the
    visit. First touch is kept for signup attribution; every tagged landing
@@ -1504,11 +1504,13 @@ function wireLanding() {
         runner.style.transform = "translateY(" + (-y) + "px)";
       }
       // world scroll
-      dist += speed * dt; speed = Math.min(400, speed + 9 * dt);
+      // Gentle intro, then real-game acceleration once you've found your feet.
+      dist += speed * dt;
+      speed = Math.min(560, speed + (dist > 600 ? 26 : 9) * dt);
       scoreEl.textContent = String(Math.floor(dist / 10));
       spawnIn -= dt * 1000;
       if (spawnIn <= 0) {
-        spawnIn = 1100 + Math.random() * 1000;
+        spawnIn = Math.max(420, (300 + Math.random() * 380) * 1000 / speed); // fixed px gap, so faster = tighter
         const el = document.createElement("div");
         el.className = "lp-dcactus"; el.innerHTML = CACTUS_SVG;
         stage.appendChild(el);
