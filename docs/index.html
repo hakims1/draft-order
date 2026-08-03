@@ -41,41 +41,6 @@
       "description": "A fantasy draft order competition app. Instead of a random draft order generator, league members take a 6-minute Wonderlic-style test or play a skill game on their phones — highest score picks their draft slot first. Members join from a shared link with no accounts.",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
       "publisher": { "@id": "https://theprovingground.app/#org" }
-    },
-    {
-      "@type": "FAQPage",
-      "mainEntity": [
-        {
-          "@type": "Question",
-          "name": "What is the best way to decide fantasy draft order?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Most leagues use a random draft order generator, which decides the most consequential moment of the season with luck. The Proving Ground replaces the draw with a competition: every member takes the same 6-minute test or plays the same skill game on their phone, and the highest score picks their draft slot first. Ties are broken by completion time." }
-        },
-        {
-          "@type": "Question",
-          "name": "Is a random draft order generator fair?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Random is neutral, but it isn't earned — someone still gets the first pick for doing nothing. A competition gives every member the same shot at the same task, so the order is deserved instead of drawn. If you still want a plain randomizer, The Proving Ground includes a free one with an animated reveal." }
-        },
-        {
-          "@type": "Question",
-          "name": "Does everyone in the league need an account?",
-          "acceptedAnswer": { "@type": "Answer", "text": "No. Only the commissioner creates an account. Members tap a shared link on their phone, type a name, and compete — no app install, no signup." }
-        },
-        {
-          "@type": "Question",
-          "name": "What happens if someone never takes the test?",
-          "acceptedAnswer": { "@type": "Answer", "text": "The commissioner can close the competition at any time. Anyone who never competed is marked DNF and picks last." }
-        },
-        {
-          "@type": "Question",
-          "name": "What about people who are bad at tests?",
-          "acceptedAnswer": { "@type": "Answer", "text": "There are two competition types — a Wonderlic-style test of wits and a reflex runner game — plus a Combine that averages both, so one skill never decides everything. And any result is still more earned than a number generator." }
-        },
-        {
-          "@type": "Question",
-          "name": "How do members take the test?",
-          "acceptedAnswer": { "@type": "Answer", "text": "Everyone competes on their own time from their phone. The clock starts when they start; timing is enforced by the server, everyone gets exactly one attempt, and the draft order reveals with an animation once the last member finishes." }
-        }
-      ]
     }
   ]
 }
@@ -85,13 +50,13 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- app.css must be the FIRST stylesheet: the embedded t-rex game injects
      keyframes into document.styleSheets[0], which throws on cross-origin sheets. -->
-<link rel="stylesheet" href="./app.css?v=31">
+<link rel="stylesheet" href="./app.css?v=32">
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./landing.css?v=31">
-<link rel="stylesheet" href="./landing-desktop.css?v=31">
-<link rel="icon" type="image/svg+xml" href="./brand/favicon.svg?v=31">
-<link rel="icon" type="image/png" sizes="32x32" href="./brand/favicon-32.png?v=31">
-<link rel="apple-touch-icon" href="./brand/apple-touch-icon.png?v=31">
+<link rel="stylesheet" href="./landing.css?v=32">
+<link rel="stylesheet" href="./landing-desktop.css?v=32">
+<link rel="icon" type="image/svg+xml" href="./brand/favicon.svg?v=32">
+<link rel="icon" type="image/png" sizes="32x32" href="./brand/favicon-32.png?v=32">
+<link rel="apple-touch-icon" href="./brand/apple-touch-icon.png?v=32">
 </head>
 <body>
 <div class="wrap" id="wrap">
@@ -118,7 +83,7 @@
 
   <div class="lp-shell">
     <nav class="lp-nav">
-      <div class="lp-logo"><img class="lp-lm" src="./brand/icon.svg?v=31" alt=""><b><i>The</i> Proving Ground</b></div>
+      <div class="lp-logo"><img class="lp-lm" src="./brand/icon.svg?v=32" alt=""><b><i>The</i> Proving Ground</b></div>
       <div style="display:flex;align-items:center;gap:12px;flex-shrink:0">
         <a class="lp-navlink" href="#/login">Log in</a>
         <a class="lp-navlink" href="#/admin/signup" style="color:var(--brass)">Get started</a>
@@ -135,10 +100,6 @@
       <div class="lp-heroCta">
         <a class="lp-btn" id="getStarted" href="#/admin/signup">Get started</a>
         <button class="lp-btn lp-outline" type="button" data-jump="#test" style="margin-top:10px">Try the 60 second version</button>
-        <button class="lp-sendline" type="button" data-copy-jump>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke-width="1.8"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M15 5H5a2 2 0 0 0-2 2v10"/></svg>
-          Already sold? <u>Send it to your league</u>
-        </button>
       </div>
     </div>
 
@@ -163,60 +124,6 @@
       </a>
     </div>
 
-    <div class="lp-stagepic" aria-hidden="true">
-      <svg viewBox="0 0 520 210" preserveAspectRatio="xMidYMax meet">
-        <defs>
-          <linearGradient id="lit" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#FFB01F" stop-opacity=".20"/><stop offset="1" stop-color="#FFB01F" stop-opacity="0"/>
-          </linearGradient>
-          <linearGradient id="lect" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#152039"/><stop offset="1" stop-color="#0B1120"/>
-          </linearGradient>
-          <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#152039" stop-opacity=".9"/><stop offset="1" stop-color="#0A0E1A" stop-opacity="0"/>
-          </linearGradient>
-        </defs>
-        <!-- spotlight cones -->
-        <polygon points="150,0 210,0 300,168 205,168" fill="url(#lit)"/>
-        <polygon points="310,0 370,0 315,168 220,168" fill="url(#lit)"/>
-        <!-- backdrop big board -->
-        <rect x="74" y="16" width="372" height="116" fill="#0D1424" stroke="#8C7231" stroke-width="1"/>
-        <g fill="#152039">
-          <rect x="84" y="26" width="352" height="9"/><rect x="84" y="40" width="352" height="9"/>
-          <rect x="84" y="54" width="352" height="9"/><rect x="84" y="68" width="352" height="9"/>
-          <rect x="84" y="82" width="352" height="9"/><rect x="84" y="96" width="352" height="9"/>
-          <rect x="84" y="110" width="352" height="9"/>
-        </g>
-        <g fill="#8C7231" opacity=".55">
-          <rect x="84" y="26" width="46" height="9"/><rect x="84" y="40" width="30" height="9"/>
-          <rect x="84" y="54" width="38" height="9"/><rect x="84" y="68" width="24" height="9"/>
-        </g>
-        <!-- truss uprights -->
-        <g stroke="#8C7231" stroke-width="1.2" fill="none" opacity=".85">
-          <path d="M60 4 V150 M70 4 V150 M60 14 L70 26 M70 14 L60 26 M60 38 L70 50 M70 38 L60 50 M60 62 L70 74 M70 62 L60 74 M60 86 L70 98 M70 86 L60 98 M60 110 L70 122 M70 110 L60 122 M60 134 L70 146 M70 134 L60 146"/>
-          <path d="M450 4 V150 M460 4 V150 M450 14 L460 26 M460 14 L450 26 M450 38 L460 50 M460 38 L450 50 M450 62 L460 74 M460 62 L450 74 M450 86 L460 98 M460 86 L450 98 M450 110 L460 122 M460 110 L450 122 M450 134 L460 146 M460 134 L450 146"/>
-        </g>
-        <!-- stage floor -->
-        <rect x="0" y="168" width="520" height="42" fill="url(#floor)"/>
-        <line x1="0" y1="168" x2="520" y2="168" stroke="#8C7231" stroke-width="1.2" opacity=".8"/>
-        <!-- carpet -->
-        <polygon points="196,168 324,168 356,210 164,210" fill="#4A1620" opacity=".55"/>
-        <!-- lectern -->
-        <path d="M232 168 L236 116 L284 116 L288 168 Z" fill="url(#lect)" stroke="#8C7231" stroke-width="1.2"/>
-        <line x1="234" y1="130" x2="286" y2="130" stroke="#8C7231" stroke-width="1" opacity=".6"/>
-        <rect x="228" y="110" width="64" height="8" fill="#C9A44C"/>
-        <text x="260" y="152" text-anchor="middle" font-family="Anton, Impact, sans-serif" font-size="15" fill="#C9A44C" letter-spacing="1">1.01</text>
-        <!-- microphone -->
-        <g stroke="#8C7231" stroke-width="1.2" fill="none"><path d="M260 110 C 250 100 252 92 244 88"/><circle cx="242" cy="87" r="2.6" fill="#8C7231"/></g>
-        <!-- stanchions + rope -->
-        <g stroke="#8C7231" stroke-width="1.4" fill="none" opacity=".9">
-          <line x1="126" y1="146" x2="126" y2="176"/><circle cx="126" cy="143" r="3" fill="#8C7231"/>
-          <line x1="394" y1="146" x2="394" y2="176"/><circle cx="394" cy="143" r="3" fill="#8C7231"/>
-          <path d="M126 150 Q 150 168 174 150" opacity=".7"/>
-          <path d="M346 150 Q 370 168 394 150" opacity=".7"/>
-        </g>
-      </svg>
-    </div>
   </div>
 </header>
 
@@ -226,30 +133,6 @@
     <span>Slot 1 · <b>Earned</b></span><span>30 questions</span><span>6:00 on the clock</span><span>One attempt each</span><span>No accounts</span><span>Slot 12 · <b>Also earned</b></span><span>Take it on your phone</span><span>Nobody gets handed the 1.01</span>
   </div>
 </div>
-
-<!-- ============ 2. PROBLEM ============ -->
-<section class="lp-sec">
-  <div class="lp-shell">
-    <div class="lp-kicker">The way it works now</div>
-    <div class="lp-split">
-      <div class="lp-randomizer" aria-hidden="true">
-        <div class="lp-rt">Draft order randomizer — shuffling</div>
-        <div class="lp-slots">
-          <div><em>Pick 1</em><span class="lp-shuf">— — —</span></div>
-          <div><em>Pick 2</em><span class="lp-shuf">— — —</span></div>
-          <div><em>Pick 3</em><span>Manager 07</span></div>
-          <div><em>Pick 4</em><span class="lp-shuf">— — —</span></div>
-          <div><em>Pick 5</em><span>Manager 02</span></div>
-        </div>
-        <div class="lp-rbtn">Shuffle again</div>
-      </div>
-      <div>
-        <h2 class="lp-stitle" style="margin-top:14px">A spreadsheet used to decide your season</h2>
-        <p class="lp-body" style="margin-top:20px">Twelve people put real money in. Somebody spent four hours on rankings. Then a number generator handed out the picks and the league year started with a shrug. <b>The most consequential moment before kickoff, and nobody competed for it.</b></p>
-      </div>
-    </div>
-  </div>
-</section>
 
 <!-- ============ 3. SAMPLE TEST ============ -->
 <section class="lp-sec" id="test">
@@ -283,6 +166,18 @@
         <a class="lp-btn lp-brass" href="#/admin/signup" style="max-width:400px;margin:0 auto">Get started</a>
       </div>
     </div>
+
+    <div class="lp-dash" id="dashPrev">
+      <div class="lp-tbar">
+        <div class="lp-lab">Preview · Event 2 — The 2D Yard Dash</div>
+        <div class="lp-tclock lp-num" id="dashScore">0</div>
+      </div>
+      <div class="lp-dstage" id="dashStage" role="button" tabindex="0" aria-label="Tap or press space to jump">
+        <div class="lp-drunner" id="dashRunner"><svg viewBox="0 0 102 98" aria-hidden="true"><polyline points="42,58 26,70 16,86" fill="none" stroke="#101319" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/><polyline points="42,58 26,70 16,86" fill="none" stroke="#EDEFF5" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><polyline points="18,82 16,88" fill="none" stroke="#101319" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/><polyline points="18,82 16,88" fill="none" stroke="#FFB01F" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><rect x="2" y="86" width="19" height="8" rx="3" transform="rotate(8 2 86)" fill="#20242E" stroke="#101319" stroke-width="2.5"/><polyline points="46,58 64,62 58,78" fill="none" stroke="#101319" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/><polyline points="46,58 64,62 58,78" fill="none" stroke="#EDEFF5" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><polyline points="60,72 58,79" fill="none" stroke="#101319" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/><polyline points="60,72 58,79" fill="none" stroke="#FFB01F" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><rect x="52" y="78" width="20" height="8" rx="3" fill="#20242E" stroke="#101319" stroke-width="2.5"/><path d="M38 34 Q44 24 58 24 Q70 26 68 36 L62 60 Q50 66 40 60 Z" fill="#1E2942" stroke="#101319" stroke-width="3"/><rect x="44" y="38" width="16" height="4.5" rx="2" fill="#FFB01F"/><rect x="46" y="46" width="12" height="4" rx="2" fill="#FFB01F"/><polyline points="52,34 42,46" fill="none" stroke="#101319" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/><polyline points="52,34 42,46" fill="none" stroke="#8A5A2B" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><ellipse cx="52" cy="50" rx="14" ry="8.5" transform="rotate(-18 52 50)" fill="#7B4222" stroke="#101319" stroke-width="2.5"/><path d="M42 52 L62 45" stroke="#EDEFF5" stroke-width="2"/><path d="M49 50 l2 -1 M53 48.6 l2 -1 M57 47.2 l2 -1" stroke="#EDEFF5" stroke-width="1.4"/><polyline points="42,46 56,54" fill="none" stroke="#101319" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/><polyline points="42,46 56,54" fill="none" stroke="#8A5A2B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="66" cy="16" r="13.5" fill="#1E2942" stroke="#101319" stroke-width="3"/><path d="M56 6 A13.5 13.5 0 0 1 76 6.5" fill="none" stroke="#FFB01F" stroke-width="4.5"/><rect x="70" y="12" width="9.5" height="11" rx="3" fill="#8A5A2B" stroke="#101319" stroke-width="2"/><circle cx="75" cy="16" r="1.4" fill="#101319"/><path d="M74 14 L90 11 M74 19 L89 17 M87 10 L88 18" fill="none" stroke="#97A1B4" stroke-width="2.6" stroke-linecap="round"/><circle cx="63" cy="17" r="2" fill="#101319" opacity=".55"/><polyline points="60,32 78,24 90,12" fill="none" stroke="#101319" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/><polyline points="60,32 78,24 90,12" fill="none" stroke="#8A5A2B" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><path d="M88 8 l4 -4 M92 10 l5 -3 M94 14 l5 -1" stroke="#101319" stroke-width="5.5" stroke-linecap="round"/><path d="M88 8 l4 -4 M92 10 l5 -3 M94 14 l5 -1" stroke="#8A5A2B" stroke-width="3" stroke-linecap="round"/></svg></div>
+        <div class="lp-dmsg" id="dashMsg">Tap to run &middot; tap to jump</div>
+      </div>
+      <div class="lp-dfoot">In the real thing: 3 practice runs, then one run that counts. Highest score picks first.</div>
+    </div>
   </div>
 </section>
 
@@ -300,115 +195,11 @@
   </div>
 </section>
 
-<!-- ============ 5. WHAT YOUR LEAGUE SEES ============ -->
-<section class="lp-sec">
+<!-- ============ 8. FAQ LINK ============ -->
+<section class="lp-sec lp-faqline">
   <div class="lp-shell">
-    <div class="lp-kicker">What your league sees</div>
-    <h2 class="lp-stitle lp-sm" style="margin-top:12px">Three taps, start to finish</h2>
-    <div class="lp-phones">
-      <div>
-        <div class="lp-phone"><div class="lp-pscreen">
-          <div class="lp-pnotch"></div>
-          <div class="lp-plab">The Gridiron Gauntlet · 2026</div>
-          <div style="font-family:var(--cond);font-size:19px;margin-top:14px;line-height:1.25">Who's taking this test?</div>
-          <div class="lp-pfield lp-ph">Your name</div>
-          <div style="font-size:11.5px;color:var(--dimmer);margin-top:12px">One attempt. Starts when you tap.</div>
-          <div class="lp-pbtn">I'm ready</div>
-        </div></div>
-        <div class="lp-pcap">Enter a name</div>
-      </div>
-      <div>
-        <div class="lp-phone"><div class="lp-pscreen">
-          <div class="lp-pnotch"></div>
-          <div class="lp-plab">Question 14 of 30</div>
-          <div class="lp-pclock lp-num">3:42</div>
-          <div class="lp-pq">In 30 days a team plays 18 games. At that rate, how many games in 45 days?</div>
-          <div class="lp-popt">A · 24</div>
-          <div class="lp-popt">B · 27</div>
-          <div class="lp-popt">C · 30</div>
-          <div class="lp-popt">D · 32</div>
-          <div class="lp-pbtn" style="margin-top:14px">Next</div>
-        </div></div>
-        <div class="lp-pcap">Clock running</div>
-      </div>
-      <div>
-        <div class="lp-phone"><div class="lp-pscreen">
-          <div class="lp-pnotch"></div>
-          <div class="lp-plab">Time</div>
-          <div class="lp-pscore lp-num">23<span style="font-size:22px;color:var(--dimmer)">/30</span></div>
-          <div style="font-family:var(--cond);font-size:17px;margin-top:12px;line-height:1.3">Currently 3rd of 12.<br><span style="color:var(--dim)">Four managers left to go.</span></div>
-          <div class="lp-pbtn">See the board</div>
-        </div></div>
-        <div class="lp-pcap">Score, then wait</div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ 6. THE REVEAL ============ -->
-<section class="lp-sec">
-  <div class="lp-shell">
-    <div class="lp-kicker">The reveal</div>
-    <h2 class="lp-stitle lp-sm" style="margin-top:12px">The order gets earned in front of everyone</h2>
-    <p class="lp-body" style="margin-top:18px;max-width:44ch">The board fills from the bottom up. Slot twelve first. Slot one last, and everybody is watching when it lands.</p>
-    <div class="lp-board lp-js-reveal" id="revealBoard">
-      <div class="lp-plate lp-twelve"><div class="lp-slot">1.12</div><div class="lp-who">Handcuff Harry</div><div class="lp-sc">14</div></div>
-      <div class="lp-plate"><div class="lp-slot">1.11</div><div class="lp-who">Bye Week Bandit</div><div class="lp-sc">15</div></div>
-      <div class="lp-plate"><div class="lp-slot">1.10</div><div class="lp-who">Second Half Sam</div><div class="lp-sc">16</div></div>
-      <div class="lp-plate"><div class="lp-slot">1.09</div><div class="lp-who">The Autodrafter</div><div class="lp-sc">17</div></div>
-      <div class="lp-plate"><div class="lp-slot">1.08</div><div class="lp-who">Flex Appeal</div><div class="lp-sc">18</div></div>
-      <div class="lp-plate"><div class="lp-slot">1.07</div><div class="lp-who">Kicker Truther</div><div class="lp-sc">19</div></div>
-      <div class="lp-plate"><div class="lp-slot">1.06</div><div class="lp-who">Trade Veto Terry</div><div class="lp-sc">20</div></div>
-      <div class="lp-plate"><div class="lp-slot">1.05</div><div class="lp-who">Zero RB Zealot</div><div class="lp-sc">21</div></div>
-      <div class="lp-plate"><div class="lp-slot">1.04</div><div class="lp-who">Play Action Jackson</div><div class="lp-sc">22</div></div>
-      <div class="lp-plate"><div class="lp-slot">1.03</div><div class="lp-who">Waiver Wire Wolf</div><div class="lp-sc">24</div></div>
-      <div class="lp-plate"><div class="lp-slot">1.02</div><div class="lp-who">Deep League Dana</div><div class="lp-sc">26</div></div>
-      <div class="lp-plate lp-one"><div class="lp-slot">1.01</div><div class="lp-who">Tank Commander</div><div class="lp-sc">28</div></div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ 7. SEND IT ============ -->
-<section class="lp-sec lp-sendsec" id="send">
-  <div class="lp-shell">
-    <div class="lp-kicker">Send it to your league</div>
-    <h2 class="lp-stitle" style="margin-top:12px">You found it.<br>Now sell it.</h2>
-    <p class="lp-body" style="margin-top:20px;max-width:46ch">You do not have to be the commissioner to start this. Copy the message below, paste it in the group chat, and let the league argue about it.</p>
-
-    <div class="lp-tones" role="group" aria-label="Message tone">
-      <button class="lp-tone" type="button" data-tone="0" aria-pressed="true">How you'd text it</button>
-      <button class="lp-tone" type="button" data-tone="1" aria-pressed="false">Harder</button>
-      <button class="lp-tone" type="button" data-tone="2" aria-pressed="false">Short</button>
-    </div>
-
-    <div class="lp-thread">
-      <div class="lp-head">
-        <div class="lp-av">12</div>
-        <b>League chat</b>
-        <span>Today 9:41 PM</span>
-      </div>
-      <div class="lp-bubble" id="msg">…</div>
-      <div class="lp-bstamp">Delivered</div>
-      <p class="lp-keys" style="margin-top:14px;font-size:13px">You get this ready to paste the moment your league is set up.</p>
-    </div>
-
-    <p class="lp-keys">Not the commissioner? Set it up and hand the keys over. Admin can be transferred in one tap.</p>
-  </div>
-</section>
-
-<!-- ============ 8. OBJECTIONS ============ -->
-<section class="lp-sec">
-  <div class="lp-shell">
-    <div class="lp-kicker">What they'll ask you</div>
-    <h2 class="lp-stitle lp-sm" style="margin-top:12px">Answers for the group chat</h2>
-    <div class="lp-qa">
-      <div><h3>Does everyone need an account?</h3><p>No. They tap the link, type a name, and go.</p></div>
-      <div><h3>What if someone never takes it?</h3><p>The admin closes it and they pick last.</p></div>
-      <div><h3>What about people who are bad at tests?</h3><p>Still more fair than a number generator, which is bad at everything.</p></div>
-      <div><h3>What if someone cheats?</h3><p>You know these people. And they'd have to be smart enough to cheat, which is sort of the point.</p></div>
-      <div><h3>What's the best way to decide fantasy draft order?</h3><p>Not a random number generator. Same task, same clock, one try each — highest score picks first. That's an order nobody can argue with.</p></div>
-      <div><h3>Just want a random draft order?</h3><p>We built a <a href="./draft-order-randomizer.html">free draft order randomizer</a> with an animated reveal. Use it once, then make them earn it next year.</p></div>
-    </div>
+    <div class="lp-kicker">Questions</div>
+    <a class="lp-faqlink" href="./faq.html">Answers for the questions your leaguemates will ask you &rarr;</a>
   </div>
 </section>
 
@@ -477,11 +268,11 @@
 
 <footer>
   <div class="lp-shell">
-    <div class="lp-fl"><img src="./brand/icon.svg?v=31" alt="">The Proving Ground</div>
+    <div class="lp-fl"><img src="./brand/icon.svg?v=32" alt="">The Proving Ground</div>
     <p>Not affiliated with, endorsed by, or connected to any professional football league, team, or broadcaster.</p>
   </div>
 </footer>
 </div>
-<script src="./app.js?v=31"></script>
+<script src="./app.js?v=32"></script>
 </body>
 </html>

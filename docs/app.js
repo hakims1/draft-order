@@ -1,7 +1,7 @@
 "use strict";
 /* Draft Order Competition — SPA. API lives on a Supabase Edge Function. */
 const API = "https://bwxsuybqhgocmwncxzlz.supabase.co/functions/v1/draftday";
-const APP_VERSION = 31;
+const APP_VERSION = 32;
 
 /* Campaign attribution: links like theprovingground.app/?src=ig-bio tag the
    visit. First touch is kept for signup attribution; every tagged landing
@@ -1471,16 +1471,78 @@ function wireLanding() {
     addTimer(timer);
   });
 
-  /* --- message preview: tone tabs only, no copy until a league exists --- */
-  const PREVIEW = MSGS_TEST.map((m) => m + "\n\n[your league's link]");
-  const msgEl = q("#msg");
-  msgEl.textContent = PREVIEW[0];
-  L.querySelectorAll(".lp-tone").forEach((t) => {
-    t.addEventListener("click", () => {
-      L.querySelectorAll(".lp-tone").forEach((o) => o.setAttribute("aria-pressed", o === t ? "true" : "false"));
-      msgEl.textContent = PREVIEW[Number(t.dataset.tone)];
+  /* --- The 2D Yard Dash preview: a tiny self-contained runner. Tap to start,
+     tap to jump, crash ends the run. Physics in px/s against the stage box. --- */
+  const stage = q("#dashStage");
+  if (stage) {
+    const runner = q("#dashRunner"), msg = q("#dashMsg"), scoreEl = q("#dashScore");
+    const CACTUS_SVG = '<svg viewBox="0 0 30 48" aria-hidden="true"><g transform="translate(15 47)" stroke="#3DDC84" stroke-linecap="round" fill="none"><path d="M0 0 V-40" stroke-width="9"/><path d="M0 -12 C-13 -12 -15 -18 -15 -27" stroke-width="7"/><path d="M0 -22 C13 -22 15 -28 15 -37" stroke-width="7"/></g></svg>';
+    let playing = false, over = false, raf = 0, y = 0, vy = 0, dist = 0, speed = 260, last = 0, spawnIn = 0;
+    let cacti = []; // {el, x}
+
+    const reset = () => {
+      cacti.forEach((c) => c.el.remove());
+      cacti = []; y = 0; vy = 0; dist = 0; speed = 260; spawnIn = 900;
+      runner.style.transform = "";
+      scoreEl.textContent = "0";
+    };
+    const stop = (crashed) => {
+      playing = false; over = crashed;
+      cancelAnimationFrame(raf);
+      msg.innerHTML = crashed
+        ? "Run over &mdash; you scored <b style=\"color:var(--amber)\">" + Math.floor(dist / 10) + "</b>. Tap to try again."
+        : "Tap to run &middot; tap to jump";
+      msg.style.display = "flex";
+    };
+    const frame = (t) => {
+      if (!playing) return;
+      const dt = Math.min(0.05, (t - last) / 1000); last = t;
+      // runner physics
+      if (y > 0 || vy !== 0) {
+        vy -= 2600 * dt; y += vy * dt;
+        if (y <= 0) { y = 0; vy = 0; }
+        runner.style.transform = "translateY(" + (-y) + "px)";
+      }
+      // world scroll
+      dist += speed * dt; speed += 3.2 * dt * 60;
+      scoreEl.textContent = String(Math.floor(dist / 10));
+      spawnIn -= dt * 1000;
+      if (spawnIn <= 0) {
+        spawnIn = 750 + Math.random() * 900;
+        const el = document.createElement("div");
+        el.className = "lp-dcactus"; el.innerHTML = CACTUS_SVG;
+        stage.appendChild(el);
+        cacti.push({ el, x: stage.clientWidth + 30 });
+      }
+      for (const cactus of cacti) {
+        cactus.x -= speed * dt;
+        cactus.el.style.transform = "translateX(" + cactus.x + "px)";
+      }
+      while (cacti.length && cacti[0].x < -40) cacti.shift().el.remove();
+      // collision: runner box (left 22, w 62 → lenient core 34..70) vs cactus (x .. x+26)
+      for (const cactus of cacti) {
+        if (cactus.x < 70 && cactus.x + 22 > 36 && y < 40) { stop(true); return; }
+      }
+      if (L.hidden) { stop(false); return; }
+      raf = requestAnimationFrame(frame);
+    };
+    const tap = () => {
+      if (!playing) {
+        reset(); playing = true; over = false;
+        msg.style.display = "none";
+        last = performance.now();
+        raf = requestAnimationFrame(frame);
+        return;
+      }
+      if (y === 0) vy = 860; // jump
+    };
+    stage.addEventListener("pointerdown", (e) => { e.preventDefault(); tap(); });
+    stage.addEventListener("keydown", (e) => {
+      if (e.key === " " || e.key === "ArrowUp") { e.preventDefault(); tap(); }
     });
-  });
+    // rAF pauses in hidden tabs; this handle lets tests step frames manually.
+    window.__dashPrev = { frame, tap, state: () => ({ playing, y, dist }) };
+  }
 
   /* --- "send it to your league" jump --- */
   L.querySelectorAll("[data-copy-jump],[data-jump]").forEach((b) => {
