@@ -1,7 +1,7 @@
 "use strict";
 /* Draft Order Competition — SPA. API lives on a Supabase Edge Function. */
 const API = "https://bwxsuybqhgocmwncxzlz.supabase.co/functions/v1/draftday";
-const APP_VERSION = 32;
+const APP_VERSION = 33;
 
 /* Campaign attribution: links like theprovingground.app/?src=ig-bio tag the
    visit. First touch is kept for signup attribution; every tagged landing
@@ -1477,12 +1477,12 @@ function wireLanding() {
   if (stage) {
     const runner = q("#dashRunner"), msg = q("#dashMsg"), scoreEl = q("#dashScore");
     const CACTUS_SVG = '<svg viewBox="0 0 30 48" aria-hidden="true"><g transform="translate(15 47)" stroke="#3DDC84" stroke-linecap="round" fill="none"><path d="M0 0 V-40" stroke-width="9"/><path d="M0 -12 C-13 -12 -15 -18 -15 -27" stroke-width="7"/><path d="M0 -22 C13 -22 15 -28 15 -37" stroke-width="7"/></g></svg>';
-    let playing = false, over = false, raf = 0, y = 0, vy = 0, dist = 0, speed = 260, last = 0, spawnIn = 0;
+    let playing = false, over = false, raf = 0, y = 0, vy = 0, dist = 0, speed = 175, last = 0, spawnIn = 0;
     let cacti = []; // {el, x}
 
     const reset = () => {
       cacti.forEach((c) => c.el.remove());
-      cacti = []; y = 0; vy = 0; dist = 0; speed = 260; spawnIn = 900;
+      cacti = []; y = 0; vy = 0; dist = 0; speed = 175; spawnIn = 1500;
       runner.style.transform = "";
       scoreEl.textContent = "0";
     };
@@ -1504,11 +1504,11 @@ function wireLanding() {
         runner.style.transform = "translateY(" + (-y) + "px)";
       }
       // world scroll
-      dist += speed * dt; speed += 3.2 * dt * 60;
+      dist += speed * dt; speed = Math.min(400, speed + 9 * dt);
       scoreEl.textContent = String(Math.floor(dist / 10));
       spawnIn -= dt * 1000;
       if (spawnIn <= 0) {
-        spawnIn = 750 + Math.random() * 900;
+        spawnIn = 1100 + Math.random() * 1000;
         const el = document.createElement("div");
         el.className = "lp-dcactus"; el.innerHTML = CACTUS_SVG;
         stage.appendChild(el);
@@ -1521,7 +1521,7 @@ function wireLanding() {
       while (cacti.length && cacti[0].x < -40) cacti.shift().el.remove();
       // collision: runner box (left 22, w 62 → lenient core 34..70) vs cactus (x .. x+26)
       for (const cactus of cacti) {
-        if (cactus.x < 70 && cactus.x + 22 > 36 && y < 40) { stop(true); return; }
+        if (cactus.x < 56 && cactus.x + 16 > 28 && y < 34) { stop(true); return; }
       }
       if (L.hidden) { stop(false); return; }
       raf = requestAnimationFrame(frame);
