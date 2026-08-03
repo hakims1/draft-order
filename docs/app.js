@@ -1,7 +1,7 @@
 "use strict";
 /* Draft Order Competition — SPA. API lives on a Supabase Edge Function. */
 const API = "https://bwxsuybqhgocmwncxzlz.supabase.co/functions/v1/draftday";
-const APP_VERSION = 33;
+const APP_VERSION = 34;
 
 /* Campaign attribution: links like theprovingground.app/?src=ig-bio tag the
    visit. First touch is kept for signup attribution; every tagged landing

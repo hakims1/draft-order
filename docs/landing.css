@@ -130,7 +130,8 @@ color:var(--text);
 /* sample test */
 .lp-test{border:1px solid var(--brass2); background:var(--panel); position:relative}
 .lp-test .lp-tbar, .lp-dash .lp-tbar{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border-bottom:1px solid var(--line); background:var(--void)}
-.lp-test .lp-tbar .lp-lab, .lp-dash .lp-tbar .lp-lab{font-family:var(--cond); text-transform:uppercase; letter-spacing:.18em; font-size:11px; color:var(--dim)}
+.lp-test .lp-tbar .lp-lab, .lp-dash .lp-tbar .lp-lab{font-family:var(--cond); text-transform:uppercase; letter-spacing:.16em; font-size:11.5px; color:var(--dim)}
+.lp-test .lp-tbar .lp-lab b, .lp-dash .lp-tbar .lp-lab b{color:var(--text); font-weight:600; font-size:14.5px; letter-spacing:.12em}
 .lp-tclock{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:34px; font-weight:600; line-height:1; color:var(--amber); letter-spacing:-.02em}
 .lp-tclock.lp-hot{color:#FF4257; animation:pulse .9s ease-in-out infinite}
 @keyframes pulse{50%{opacity:.55}}
@@ -333,8 +334,7 @@ color:var(--text);
 
   /* Sample test: section title left, live card right. */
   #test .lp-shell{display:grid; grid-template-columns:.72fr 1.28fr; column-gap:72px; align-items:center}
-  #test .lp-kicker{align-self:end}
-  #test .lp-stitle{font-size:clamp(44px,4.2vw,58px); align-self:start}
+  #test .lp-stitle{font-size:clamp(44px,4.2vw,58px); grid-row:1/4; align-self:center}
   #test .lp-test{grid-column:2; grid-row:1/4; margin:0; max-width:none}
 
   /* Reveal: copy left (sticky), board right. */
