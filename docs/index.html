@@ -3,7 +3,84 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>The Proving Ground — Draft Order Competition</title>
+<title>Fantasy Draft Order — Earn It, Don't Randomize It | The Proving Ground</title>
+<meta name="description" content="Stop letting a random number generator hand out the 1.01. Your league takes a 6-minute test or plays a skill game on their phones — highest score picks first. No accounts for members, free to run.">
+<link rel="canonical" href="https://theprovingground.app/">
+<meta name="theme-color" content="#0A0E1A">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="The Proving Ground">
+<meta property="og:title" content="Fantasy Draft Order — Earn It, Don't Randomize It">
+<meta property="og:description" content="Your league competes for draft position: a 6-minute Wonderlic-style test or a reflex game, on their phones, no accounts. Highest score picks first.">
+<meta property="og:url" content="https://theprovingground.app/">
+<meta property="og:image" content="https://theprovingground.app/brand/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Fantasy Draft Order — Earn It, Don't Randomize It">
+<meta name="twitter:description" content="Your league competes for draft position: a 6-minute test or a reflex game, on their phones. Highest score picks first.">
+<meta name="twitter:image" content="https://theprovingground.app/brand/og.png">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://theprovingground.app/#org",
+      "name": "The Proving Ground",
+      "url": "https://theprovingground.app/",
+      "logo": "https://theprovingground.app/brand/apple-touch-icon.png"
+    },
+    {
+      "@type": "WebApplication",
+      "name": "The Proving Ground",
+      "url": "https://theprovingground.app/",
+      "applicationCategory": "GameApplication",
+      "operatingSystem": "Any (web browser)",
+      "description": "A fantasy draft order competition app. Instead of a random draft order generator, league members take a 6-minute Wonderlic-style test or play a skill game on their phones — highest score picks their draft slot first. Members join from a shared link with no accounts.",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "publisher": { "@id": "https://theprovingground.app/#org" }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is the best way to decide fantasy draft order?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Most leagues use a random draft order generator, which decides the most consequential moment of the season with luck. The Proving Ground replaces the draw with a competition: every member takes the same 6-minute test or plays the same skill game on their phone, and the highest score picks their draft slot first. Ties are broken by completion time." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is a random draft order generator fair?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Random is neutral, but it isn't earned — someone still gets the first pick for doing nothing. A competition gives every member the same shot at the same task, so the order is deserved instead of drawn. If you still want a plain randomizer, The Proving Ground includes a free one with an animated reveal." }
+        },
+        {
+          "@type": "Question",
+          "name": "Does everyone in the league need an account?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. Only the commissioner creates an account. Members tap a shared link on their phone, type a name, and compete — no app install, no signup." }
+        },
+        {
+          "@type": "Question",
+          "name": "What happens if someone never takes the test?",
+          "acceptedAnswer": { "@type": "Answer", "text": "The commissioner can close the competition at any time. Anyone who never competed is marked DNF and picks last." }
+        },
+        {
+          "@type": "Question",
+          "name": "What about people who are bad at tests?",
+          "acceptedAnswer": { "@type": "Answer", "text": "There are two competition types — a Wonderlic-style test of wits and a reflex runner game — plus a Combine that averages both, so one skill never decides everything. And any result is still more earned than a number generator." }
+        },
+        {
+          "@type": "Question",
+          "name": "How do members take the test?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Everyone competes on their own time from their phone. The clock starts when they start; timing is enforced by the server, everyone gets exactly one attempt, and the draft order reveals with an animation once the last member finishes." }
+        }
+      ]
+    }
+  ]
+}
+</script>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- app.css must be the FIRST stylesheet: the embedded t-rex game injects
@@ -20,7 +97,9 @@
 <div class="wrap" id="wrap">
   <div id="app" class="center" style="padding-top:40px"><div class="mut">Loading…</div></div>
 </div>
-<div id="landing" hidden>
+<!-- Visible by default so non-JS crawlers (AI engines especially) read the
+     page; route() hides it immediately for app views. -->
+<div id="landing">
 <!-- ============ 1. HERO ============ -->
 <header class="lp-hero">
   <div class="lp-stage" aria-hidden="true">
@@ -327,6 +406,8 @@
       <div><h3>What if someone never takes it?</h3><p>The admin closes it and they pick last.</p></div>
       <div><h3>What about people who are bad at tests?</h3><p>Still more fair than a number generator, which is bad at everything.</p></div>
       <div><h3>What if someone cheats?</h3><p>You know these people. And they'd have to be smart enough to cheat, which is sort of the point.</p></div>
+      <div><h3>What's the best way to decide fantasy draft order?</h3><p>Not a random number generator. Same task, same clock, one try each — highest score picks first. That's an order nobody can argue with.</p></div>
+      <div><h3>Just want a random draft order?</h3><p>We built a <a href="./draft-order-randomizer.html">free draft order randomizer</a> with an animated reveal. Use it once, then make them earn it next year.</p></div>
     </div>
   </div>
 </section>

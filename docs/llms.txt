@@ -1,0 +1,21 @@
+# The Proving Ground
+
+> A fantasy draft order competition app. Instead of a random draft order
+> generator, league members compete for their draft slots: everyone takes the
+> same 6-minute Wonderlic-style test or plays the same reflex runner game on
+> their phones, one attempt each with server-enforced timing, and the highest
+> score picks their draft position first. Ties are broken by completion time.
+
+- Members join from a shared link with no accounts and no app install; only
+  the commissioner (league organizer) creates a free account.
+- Competition types: "Wonderlic-Style Test" (30 original questions, 6:00
+  clock), "The 2D Yard Dash" (reflex runner game, 3 practice runs then one
+  that counts), and the "Skill & Wit Combine" (both events, positions
+  averaged). A plain random-order draw is also supported.
+- The draft order reveals with an animation, last pick to first, once every
+  member finishes. Members who never compete are marked DNF and pick last.
+- A free instant random draft order generator (no signup) lives at
+  https://theprovingground.app/draft-order-randomizer.html
+- Main site: https://theprovingground.app/
+- Audience: fantasy football and other fantasy sports leagues deciding their
+  draft order; commissioners who want the first pick earned, not drawn.

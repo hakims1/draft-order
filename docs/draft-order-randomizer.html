@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Free Fantasy Draft Order Randomizer — Instant, Fair, No Signup</title>
+<meta name="description" content="Free random draft order generator for fantasy football and any draft. Paste your league's team names, hit shuffle, and get a fair order with an animated last-to-first reveal. No signup, no ads.">
+<link rel="canonical" href="https://theprovingground.app/draft-order-randomizer.html">
+<meta name="theme-color" content="#0A0E1A">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="The Proving Ground">
+<meta property="og:title" content="Free Fantasy Draft Order Randomizer">
+<meta property="og:description" content="Paste your league's names, hit shuffle, get a fair draft order with an animated reveal. Free, instant, no signup.">
+<meta property="og:url" content="https://theprovingground.app/draft-order-randomizer.html">
+<meta property="og:image" content="https://theprovingground.app/brand/og.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebApplication",
+      "name": "Fantasy Draft Order Randomizer",
+      "url": "https://theprovingground.app/draft-order-randomizer.html",
+      "applicationCategory": "UtilityApplication",
+      "operatingSystem": "Any (web browser)",
+      "description": "A free random draft order generator. Enter team or player names, shuffle with a cryptographically fair algorithm, and reveal the order last pick to first.",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "publisher": { "@type": "Organization", "name": "The Proving Ground", "url": "https://theprovingground.app/" }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How does the draft order randomizer work?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Enter one team or manager name per line and hit shuffle. The order is drawn with a Fisher-Yates shuffle seeded by your browser's cryptographic random number generator — the same class of randomness used for security keys — so every permutation is equally likely. The result reveals from the last pick up to the first." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is this random draft order generator actually fair?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes — every order is equally likely and nothing is weighted. But random means lucky, not earned. If your league wants the first pick to mean something, run a real competition: everyone takes the same 6-minute test or plays the same skill game, and the highest score picks first." }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I rerun the shuffle if I don't like the result?",
+          "acceptedAnswer": { "@type": "Answer", "text": "You can shuffle as many times as you want before you share it — that is exactly the problem with random draft orders. When it matters, do the draw live in the group chat, or use a competition where the result can't be rerolled." }
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+<style>
+  :root{
+    --void:#0A0E1A; --panel:#0D1424; --panel2:#152039; --line:#1E2942;
+    --text:#EDEFF5; --dim:#8B94A9; --dimmer:#5A6379;
+    --brass:#C9A44C; --brass2:#8C7231; --amber:#FFB01F;
+    --disp:"Anton","Arial Narrow",Impact,sans-serif;
+    --cond:"Oswald","Arial Narrow",sans-serif;
+    --sys:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--void);color:var(--text);font-family:var(--sys);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:var(--brass);text-decoration:none}
+  a:hover{color:var(--amber)}
+  .shell{max-width:760px;margin:0 auto;padding:0 20px}
+  h1,h2{font-family:var(--disp);font-weight:400;text-transform:uppercase;line-height:.95}
+  nav{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:22px 0}
+  nav .logo{display:flex;align-items:center;gap:9px;color:var(--text);font-family:var(--disp);text-transform:uppercase;font-size:17px;white-space:nowrap}
+  nav .logo img{width:26px;height:26px;display:block}
+  nav .logo i{font-style:normal;color:var(--brass)}
+  nav a.app{font-family:var(--cond);text-transform:uppercase;letter-spacing:.14em;font-size:11.5px}
+  .kicker{font-family:var(--cond);font-weight:500;text-transform:uppercase;letter-spacing:.26em;font-size:11px;color:var(--brass)}
+  h1{font-size:clamp(38px,9vw,64px);margin-top:10px}
+  .sub{color:var(--dim);margin-top:14px;max-width:52ch}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:2px;padding:20px;margin-top:26px}
+  label{display:block;font-family:var(--cond);text-transform:uppercase;letter-spacing:.16em;font-size:11.5px;color:var(--dim);margin-bottom:8px}
+  textarea{
+    width:100%;min-height:190px;background:var(--panel2);border:1px solid var(--line);border-radius:2px;
+    color:var(--text);font-family:var(--mono);font-size:15px;line-height:1.7;padding:12px 14px;resize:vertical;
+  }
+  textarea:focus{outline:none;border-color:var(--brass2)}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;width:100%;min-height:56px;margin-top:14px;
+    background:var(--amber);color:#0A0E1A;border:0;border-radius:2px;cursor:pointer;
+    font-family:var(--disp);text-transform:uppercase;font-size:19px;letter-spacing:.02em;
+  }
+  .btn:active{filter:brightness(.88)}
+  .btn.ghost{background:transparent;color:var(--text);border:1px solid var(--brass2);font-size:16px;min-height:50px}
+  .hint{color:var(--dimmer);font-size:13px;margin-top:10px}
+  #board{margin-top:8px;border-top:1px solid var(--brass2)}
+  .plate{
+    display:grid;grid-template-columns:64px 1fr;gap:12px;align-items:center;min-height:54px;
+    background:var(--panel);border-bottom:1px solid var(--line);padding:11px 14px;
+    opacity:0;transform:translateY(10px);transition:opacity .45s,transform .45s;
+  }
+  .plate.on{opacity:1;transform:none}
+  .plate .slot{font-family:var(--mono);font-size:18px;color:var(--dimmer)}
+  .plate .who{font-family:var(--cond);font-weight:500;text-transform:uppercase;font-size:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .plate.first{background:linear-gradient(180deg,rgba(201,164,76,.16),var(--panel2));border:1px solid var(--brass);padding:16px 14px}
+  .plate.first .slot{color:var(--brass)}
+  .plate.first .who{font-family:var(--disp);font-size:24px}
+  .copied{font-family:var(--cond);text-transform:uppercase;letter-spacing:.16em;font-size:11.5px;color:#3DDC84;margin-top:10px;min-height:16px;opacity:0;transition:opacity .2s}
+  .copied.on{opacity:1}
+  .pitch{border:1px solid var(--brass);background:linear-gradient(180deg,var(--panel2),var(--panel));padding:24px 20px;margin-top:34px}
+  .pitch h2{font-size:clamp(26px,6.4vw,38px)}
+  .pitch p{color:var(--dim);margin-top:12px}
+  .pitch a.btn{margin-top:18px}
+  .prose{margin-top:40px}
+  .prose h2{font-size:clamp(24px,5.6vw,32px);margin-top:30px}
+  .prose p{color:var(--dim);margin-top:12px}
+  .prose b{color:var(--text)}
+  footer{border-top:1px solid var(--line);margin-top:56px;padding:24px 0 36px;color:var(--dimmer);font-size:12.5px}
+  @media(min-width:900px){
+    .toolgrid{display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start}
+    .card{margin-top:30px}
+  }
+</style>
+<link rel="icon" type="image/svg+xml" href="./brand/favicon.svg?v=31">
+<link rel="apple-touch-icon" href="./brand/apple-touch-icon.png?v=31">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="shell">
+  <nav>
+    <a class="logo" href="./"><img src="./brand/icon.svg?v=31" alt=""><span><i>The</i> Proving Ground</span></a>
+    <a class="app" href="./#/admin/signup">Make them earn it →</a>
+  </nav>
+
+  <header style="margin-top:26px">
+    <div class="kicker">Free tool · No signup</div>
+    <h1>Fantasy Draft Order Randomizer</h1>
+    <p class="sub">One name per line, one button, one fair draw. Every order is equally likely — drawn with your browser's cryptographic random number generator and revealed last pick to first, just like draft night.</p>
+  </header>
+
+  <div class="toolgrid">
+    <div class="card">
+      <label for="names">Teams or managers — one per line</label>
+      <textarea id="names" spellcheck="false" placeholder="Tank Commander
+Waiver Wire Wolf
+Deep League Dana
+Zero RB Zealot"></textarea>
+      <button class="btn" id="go" type="button">Shuffle the order</button>
+      <div class="hint">Nothing leaves your browser. Shuffle as many times as you like — that's the flaw, not a feature.</div>
+    </div>
+
+    <div class="card" id="resultCard" hidden>
+      <label>The order</label>
+      <div id="board"></div>
+      <button class="btn ghost" id="copy" type="button">Copy order for the group chat</button>
+      <div class="copied" id="copied">Copied!</div>
+    </div>
+  </div>
+
+  <div class="pitch">
+    <div class="kicker">The better way</div>
+    <h2>Random is lucky.<br>Earned is settled.</h2>
+    <p>A randomizer hands somebody the first pick for doing nothing — and it can be rerolled until the commissioner likes the result. The Proving Ground replaces the draw with a real competition: your whole league takes the same 6-minute test or plays the same skill game on their phones, one attempt each, server-enforced. Highest score picks first, and nobody can argue with it.</p>
+    <a class="btn" href="./#/admin/signup">Set up a real competition — free</a>
+  </div>
+
+  <div class="prose">
+    <h2>How this random draft order generator works</h2>
+    <p>Enter your league's team or manager names, one per line, and hit shuffle. The order is drawn with a <b>Fisher–Yates shuffle</b> seeded by <b>crypto.getRandomValues</b> — the same class of randomness browsers use for security keys — so every possible order is exactly equally likely. No weighting, no house thumb on the scale, and your names never leave the page.</p>
+    <h2>Random order vs. earned order</h2>
+    <p>Random is <b>neutral</b>, but it isn't <b>fair</b> in the way competitors mean the word: the person who gets the 1.01 did nothing to deserve it, and the person picking last did nothing wrong. If your league puts real money in, the draft slot is the single most consequential thing decided before kickoff. A six-minute competition — same questions, same clock, one try each — turns that moment from a coin flip into a result. That's what <a href="./">The Proving Ground</a> is for.</p>
+  </div>
+</div>
+
+<footer>
+  <div class="shell">
+    <div>The Proving Ground — <a href="./">theprovingground.app</a></div>
+    <div style="margin-top:6px">Not affiliated with, endorsed by, or connected to any professional football league, team, or broadcaster.</div>
+  </div>
+</footer>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+
+function shuffle(arr) {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    const j = buf[0] % (i + 1);
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+let lastOrder = [];
+$("#go").onclick = () => {
+  const names = $("#names").value.split("\n").map((s) => s.trim()).filter(Boolean);
+  if (names.length < 2) { $("#names").focus(); return; }
+  lastOrder = shuffle(names);
+  const board = $("#board");
+  $("#resultCard").hidden = false;
+  board.innerHTML = lastOrder.map((n, i) =>
+    '<div class="plate' + (i === 0 ? " first" : "") + '"><span class="slot">1.' + String(i + 1).padStart(2, "0") +
+    '</span><span class="who"></span></div>').join("");
+  const plates = [...board.querySelectorAll(".plate")];
+  plates.forEach((p, i) => { p.querySelector(".who").textContent = lastOrder[i]; });
+  // Reveal from the last pick up to the first, like draft night.
+  [...plates].reverse().forEach((p, i) => setTimeout(() => p.classList.add("on"), 350 * i));
+  $("#resultCard").scrollIntoView({ behavior: "smooth", block: "nearest" });
+};
+
+$("#copy").onclick = async () => {
+  const text = "Draft order:\n" + lastOrder.map((n, i) => (i + 1) + ". " + n).join("\n") +
+    "\n\n(drawn at theprovingground.app — next year they earn it)";
+  try { await navigator.clipboard.writeText(text); } catch {}
+  $("#copied").classList.add("on");
+  setTimeout(() => $("#copied").classList.remove("on"), 1800);
+};
+</script>
+</body>
+</html>
