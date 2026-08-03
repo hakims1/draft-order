@@ -78,9 +78,7 @@
   }
   .lp-hp-desc{font-family:var(--sys); font-size:14.5px; line-height:1.5; color:var(--dim); margin-top:7px; text-wrap:pretty}
 
-  /* stage art demoted to ambience behind the cards */
-  .lp-hero .lp-stagepic{
-    position:absolute; z-index:0; right:-40px; bottom:-30px;
-    width:660px; max-width:none; margin:0; opacity:.2; pointer-events:none;
-  }
+  /* stage art removed on desktop — the challenge cards are the visual.
+     Mobile/tablet keep .lp-stagepic in its original spot below the CTAs. */
+  .lp-hero .lp-stagepic{display:none}
 }
