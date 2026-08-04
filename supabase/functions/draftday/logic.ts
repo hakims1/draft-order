@@ -522,7 +522,8 @@ export async function submitRun(comp: any, attempt: any, rawScore: number) {
 export async function participantKeyEntitled(participantId: string): Promise<boolean> {
   const rows = await sql`
     select 1 from entitlements
-    where granted_to_participant_id = ${participantId} and sku = 'answer_key'`;
+    where granted_to_participant_id = ${participantId} and sku = 'answer_key'
+      and revoked_at is null`;
   return rows.length > 0;
 }
 

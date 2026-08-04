@@ -1,7 +1,7 @@
 "use strict";
 /* Draft Order Competition — SPA. API lives on a Supabase Edge Function. */
 const API = "https://bwxsuybqhgocmwncxzlz.supabase.co/functions/v1/draftday";
-const APP_VERSION = 35;
+const APP_VERSION = 36;
 
 /* Campaign attribution: links like theprovingground.app/?src=ig-bio tag the
    visit. First touch is kept for signup attribution; every tagged landing
@@ -21,6 +21,25 @@ const APP_VERSION = 35;
     }
   } catch { /* storage blocked — attribution is best-effort */ }
 })();
+
+/* Checkout. Posts to /api/checkout and hands off to Stripe when it answers
+   with a hosted URL; before Stripe is configured (and when the buyer already
+   owns the SKU) it resolves normally and the caller just carries on. */
+async function startCheckout(body, extraHeaders) {
+  const headers = Object.assign({ "content-type": "application/json" }, extraHeaders || {});
+  const adm = localStorage.getItem("adm");
+  if (adm && !headers.authorization) headers.authorization = "Bearer " + adm;
+  let r;
+  try {
+    r = await fetch(API + "/api/checkout", {
+      method: "POST", headers, body: JSON.stringify(body),
+    }).then((x) => x.json());
+  } catch {
+    return { error: "Network error. Try again." };
+  }
+  if (r && r.url) { location.href = r.url; return { redirecting: true }; }
+  return r || {};
+}
 
 /* Stale-cache self-heal: if the server says a newer frontend exists, reload
    once with a cache-busting query. Guarded so it can never loop. */
@@ -971,11 +990,11 @@ function memberView(TOKEN) {
       const label = b.textContent;
       b.textContent = "Unlocking\u2026";
       try {
-        const r = await fetch(API + "/api/entitlements/grant", {
-          method: "POST",
-          headers: { "content-type": "application/json", "x-pt": localStorage.getItem(ptKey) || "" },
-          body: JSON.stringify({ sku: "answer_key", competition_id: S.competition_id }),
-        }).then((x) => x.json());
+        const r = await startCheckout(
+          { sku: "answer_key", competition_id: S.competition_id },
+          { "x-pt": localStorage.getItem(ptKey) || "" },
+        );
+        if (r.redirecting) return;
         if (r.error) { b.disabled = false; b.textContent = label; alert(r.error); return; }
         await refresh(); // key-state change forces a full re-render now
       } catch { b.disabled = false; b.textContent = label; }
@@ -1075,11 +1094,11 @@ function renderLogin(error, mode) {
       localStorage.removeItem("key_intent");
       try {
         const intent = JSON.parse(intentRaw);
-        await fetch(API + "/api/entitlements/grant", {
-          method: "POST",
-          headers: { "content-type": "application/json", "x-pt": localStorage.getItem("pt_" + intent.token) || "" },
-          body: JSON.stringify({ sku: "answer_key", competition_id: intent.competition_id }),
-        });
+        const r = await startCheckout(
+          { sku: "answer_key", competition_id: intent.competition_id },
+          { "x-pt": localStorage.getItem("pt_" + intent.token) || "" },
+        );
+        if (r.redirecting) return;
         location.hash = "#/c/" + intent.token;
         return;
       } catch {}
@@ -1153,7 +1172,8 @@ async function adminHome() {
         openUltimateModal(
           (d.prices && d.prices.ultimate) || 19,
           async () => {
-            const g = await aapi("/api/entitlements/grant", { sku: "ultimate" });
+            const g = await startCheckout({ sku: "ultimate" });
+            if (g.redirecting) return;
             if (g.error) { $("#lerr").textContent = g.error; return; }
             d.entitlements = d.entitlements || {};
             d.entitlements.ultimate = true;
@@ -1187,7 +1207,8 @@ async function adminHome() {
     openUltimateModal(
       (d.prices && d.prices.ultimate) || 19,
       async () => {
-        const g = await aapi("/api/entitlements/grant", { sku: "ultimate" });
+        const g = await startCheckout({ sku: "ultimate" });
+        if (g.redirecting) return;
         if (g.error) { $("#lerr").textContent = g.error; return; }
         d.entitlements = d.entitlements || {};
         d.entitlements.ultimate = true;
@@ -1602,5 +1623,32 @@ function route() {
   }
   return adminHome();
 }
+/* Return from Stripe Checkout. The webhook is authoritative, but the buyer
+   can beat it back here, so confirm the session before the first paint and
+   then drop the param. Capped so a slow confirm never strands the page —
+   the webhook will have granted it either way. */
+async function confirmCheckoutReturn() {
+  const params = new URLSearchParams(location.search);
+  const sid = params.get("pg_checkout");
+  if (!sid) return;
+  params.delete("pg_checkout");
+  const rest = params.toString();
+  const clean = location.pathname + (rest ? "?" + rest : "") + location.hash;
+
+  app().innerHTML = '<div class="center" style="padding-top:60px"><div class="mut">Confirming your payment…</div></div>';
+  const headers = {};
+  const adm = localStorage.getItem("adm");
+  if (adm) headers.authorization = "Bearer " + adm;
+  const m = location.hash.match(/^#\/c\/([\w-]+)/);
+  if (m) headers["x-pt"] = localStorage.getItem("pt_" + m[1]) || "";
+  try {
+    await Promise.race([
+      fetch(API + "/api/checkout/" + encodeURIComponent(sid), { method: "POST", headers }),
+      new Promise((res) => setTimeout(res, 6000)),
+    ]);
+  } catch { /* the webhook is the source of truth; fall through either way */ }
+  history.replaceState(null, "", clean);
+}
+
 window.addEventListener("hashchange", route);
-route();
+confirmCheckoutReturn().then(route);

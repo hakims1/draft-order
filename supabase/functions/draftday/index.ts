@@ -28,10 +28,17 @@ import {
   submitRun,
 } from "./logic.ts";
 import { checkGate, hasEntitlement, isOwner, logEvent } from "./gates.ts";
+import {
+  confirmSession,
+  createCheckoutSession,
+  grantEntitlement,
+  handleWebhook,
+  stripeEnabled,
+} from "./stripe.ts";
 
 const FN = "draftday";
 // Bumped with every frontend release; stale clients hard-reload themselves.
-const APP_VERSION = 35;
+const APP_VERSION = 36;
 // Public site (GitHub Pages). Share/results URLs are built against this.
 const SITE = (Deno.env.get("SITE_ORIGIN") ?? "https://hakims1.github.io/draft-order/").replace(/\/?$/, "/");
 
@@ -717,7 +724,100 @@ app.get("/api/admin/competition/:id/live", async (c) => {
 
 // ---------------- entitlements (mock purchases; real payments swap in later) ----------------
 
+// ---------------- payments ----------------
+
+// One endpoint for both SKUs. With Stripe configured it returns a Checkout
+// URL; without it, it performs the mock grant that carried the product before
+// payments existed, so the flow works identically in both worlds and the
+// client only has to ask "did I get a url back?".
+app.post("/api/checkout", async (c) => {
+  const b = await c.req.json().catch(() => ({}));
+  const sku = String(b.sku ?? "");
+  if (sku !== "ultimate" && sku !== "answer_key") return c.json({ error: "Unknown sku." }, 400);
+
+  if (sku === "ultimate") {
+    const admin = await requireAdmin(c);
+    if (!admin) return c.json({ error: "unauthorized" }, 401);
+    if (await hasEntitlement(admin.id, "ultimate")) return c.json({ ok: true, already: true });
+
+    if (!stripeEnabled()) {
+      await grantEntitlement({ sku, adminId: admin.id, source: "mock" });
+      await logEvent("purchase_mock", { adminId: admin.id, props: { sku, price: PRICES.ultimate } });
+      return c.json({ ok: true, mock: true });
+    }
+    const url = await createCheckoutSession({
+      sku, site: SITE, returnHash: "/admin", adminId: admin.id, email: admin.email,
+    });
+    await logEvent("checkout_started", { adminId: admin.id, props: { sku, price: PRICES.ultimate } });
+    return c.json({ url });
+  }
+
+  // answer_key — per seat, and only for a seat that has finished its test.
+  const compId = String(b.competition_id ?? "");
+  const rows = await sql`select * from competitions where id = ${compId}`.catch(() => []);
+  const comp = rows[0];
+  if (!comp) return c.json({ error: "Competition not found." }, 404);
+  const participant = await participantBySession(comp.id, c.req.header("x-pt"));
+  if (!participant) return c.json({ error: "unauthorized" }, 401);
+  const testAtt = await currentAttempt(participant.id, "wonderlic");
+  if (testAtt?.status !== "finished") {
+    return c.json({ error: "Finish your test first — then the key unlocks." }, 403);
+  }
+  if (await participantKeyEntitled(participant.id)) return c.json({ ok: true, already: true });
+
+  // The buyer signs up before checkout, so an admin account is normally
+  // present; it is recorded as the payer for receipts and refunds.
+  const buyer = await requireAdmin(c);
+  if (!stripeEnabled()) {
+    await grantEntitlement({
+      sku, competitionId: comp.id, participantId: participant.id,
+      adminId: buyer?.id ?? null, source: "mock",
+    });
+    await logEvent("purchase_mock", {
+      competitionId: comp.id, participantId: participant.id,
+      props: { sku, price: PRICES.answer_key },
+    });
+    return c.json({ ok: true, mock: true });
+  }
+  const url = await createCheckoutSession({
+    sku, site: SITE, returnHash: `/c/${comp.share_token}`,
+    competitionId: comp.id, participantId: participant.id,
+    adminId: buyer?.id ?? null, email: buyer?.email ?? null,
+  });
+  await logEvent("checkout_started", {
+    competitionId: comp.id, participantId: participant.id,
+    props: { sku, price: PRICES.answer_key },
+  });
+  return c.json({ url });
+});
+
+// Return path from Checkout. The webhook is authoritative, but a buyer can
+// beat it back to the site; this grants through the same idempotent path so
+// the feature is unlocked by the time the page repaints.
+app.post("/api/checkout/:sessionId", async (c) => {
+  if (!stripeEnabled()) return c.json({ ok: false, error: "not configured" });
+  try {
+    const r = await confirmSession(c.req.param("sessionId"));
+    return c.json(r);
+  } catch (e) {
+    console.error("checkout confirm failed:", e);
+    return c.json({ ok: false, error: "Could not confirm that payment." }, 502);
+  }
+});
+
+// Stripe webhook. Must read the RAW body — parsing it first would break
+// signature verification.
+app.post("/stripe/webhook", async (c) => {
+  const sig = c.req.header("stripe-signature") ?? "";
+  const raw = await c.req.text();
+  const r = await handleWebhook(raw, sig);
+  return c.json(r.body, r.status as any);
+});
+
+// Legacy mock grant. Kept for the pre-Stripe client, but it hands out paid
+// features for free, so it is refused the moment real payments are live.
 app.post("/api/entitlements/grant", async (c) => {
+  if (stripeEnabled()) return c.json({ error: "Use /api/checkout." }, 410);
   const b = await c.req.json().catch(() => ({}));
   const sku = String(b.sku ?? "");
 

@@ -63,7 +63,7 @@ export async function hasEntitlement(adminId: string, sku = "ultimate"): Promise
   if (!adminId) return false;
   const rows = await sql`
     select 1 from entitlements
-    where admin_id = ${adminId} and sku = ${sku}`;
+    where admin_id = ${adminId} and sku = ${sku} and revoked_at is null`;
   return rows.length > 0;
 }
 
