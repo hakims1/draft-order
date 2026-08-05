@@ -28,6 +28,7 @@ import {
   submitRun,
 } from "./logic.ts";
 import { checkGate, hasEntitlement, isOwner, logEvent } from "./gates.ts";
+import { buildCompletionEmail, emailEnabled, notifyCompetitionComplete } from "./email.ts";
 import {
   confirmSession,
   createCheckoutSession,
@@ -38,7 +39,7 @@ import {
 
 const FN = "draftday";
 // Bumped with every frontend release; stale clients hard-reload themselves.
-const APP_VERSION = 36;
+const APP_VERSION = 37;
 // Public site (GitHub Pages). Share/results URLs are built against this.
 const SITE = (Deno.env.get("SITE_ORIGIN") ?? "https://hakims1.github.io/draft-order/").replace(/\/?$/, "/");
 
@@ -83,6 +84,18 @@ async function sweepExpired(comp: any) {
   for (const a of expired) await finalizeAttempt(a, comp, true);
 }
 
+// "The order is in" email to the commissioner, fired the first time anyone
+// observes the competition as complete — the last member's submit, another
+// member's poll, or a manual close. notifyCompetitionComplete() claims the
+// send with a conditional UPDATE, so concurrent observers can't double-send.
+// Detached from the response: nobody waits on an email hop.
+function notifyIfComplete(comp: any, visible: boolean) {
+  if (!visible || comp?.completed_notified_at) return;
+  const p = notifyCompetitionComplete(comp, SITE).catch((e) =>
+    console.error("completion notify failed:", e));
+  try { (globalThis as any).EdgeRuntime?.waitUntil?.(p); } catch { /* not on Edge Runtime */ }
+}
+
 async function memberState(c: any, comp: any, light = false) {
   await sweepExpired(comp);
   const ptoken = c.req.header("x-pt") || undefined;
@@ -92,6 +105,7 @@ async function memberState(c: any, comp: any, light = false) {
     select count(*)::int as joined from participants
     where competition_id = ${comp.id} and not is_placeholder`;
   const visible = standingsVisible(comp, finished);
+  notifyIfComplete(comp, visible);
   const league = { name: comp.name, member_count: comp.member_count };
   const displayCount = comp.type === "random_order" ? joined : finished;
   const events = eventsFor(comp);
@@ -633,12 +647,30 @@ app.post("/api/admin/competition/:id/activate", async (c) => {
   return c.json({ ok: true });
 });
 
+// Renders the completion email for one of your own competitions without
+// sending it. Returned as JSON because Supabase rewrites text/html on
+// *.supabase.co responses.
+app.get("/api/admin/competition/:id/email-preview", async (c) => {
+  const admin = await requireAdmin(c);
+  if (!admin) return c.json({ error: "unauthorized" }, 401);
+  const comp = await ownedCompetition(admin.id, c.req.param("id"));
+  if (!comp) return c.json({ error: "not found" }, 404);
+  const [owned] = await sql`
+    select 1 from entitlements
+    where revoked_at is null
+      and ((sku = 'ultimate' and admin_id = ${admin.id})
+        or (sku = 'answer_key' and competition_id = ${comp.id} and buyer_admin_id = ${admin.id}))`;
+  const mail = await buildCompletionEmail(comp, SITE, { canBuyKey: !owned, hasKey: !!owned });
+  return c.json({ to: admin.email, ...mail, would_send: emailEnabled() });
+});
+
 app.post("/api/admin/competition/:id/close", async (c) => {
   const admin = await requireAdmin(c);
   if (!admin) return c.json({ error: "unauthorized" }, 401);
   const comp = await ownedCompetition(admin.id, c.req.param("id"));
   if (!comp) return c.json({ error: "not found" }, 404);
   if (comp.status === "active") await closeCompetition(comp.id);
+  notifyIfComplete(comp, true); // closing is a completion too
   return c.json({ ok: true });
 });
 
